@@ -1,17 +1,19 @@
 import os
 import shlex
+import shutil
 import subprocess
 from itertools import chain
 from os import path
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 from openpose_layouts.openpose_layout import OpenPoseLayout
 from utils.tools import read_json, write_json
 
 
-class Tracker:
+class AcurusTracker:
     def __init__(self, skeleton_layout: OpenPoseLayout):
         self.skeleton_layout = skeleton_layout
         self.special_joints = {
@@ -32,7 +34,7 @@ class Tracker:
         file_names = [path.join(openpose_dir, f) for f in os.listdir(openpose_dir) if path.isfile(path.join(openpose_dir, f)) and f.endswith('json')]
 
         result = {}
-        for frame, file in enumerate(file_names):
+        for frame, file in tqdm(enumerate(file_names), ascii=True, desc="Openpose to Acurus"):
             skeletons = []
             json = read_json(file)
             people = json['people']
@@ -51,7 +53,7 @@ class Tracker:
 
     def skeleton_to_acurus(self, skeleton):
         result = {}
-        for frame_id, frame_info in enumerate(skeleton):
+        for frame_id, frame_info in tqdm(enumerate(skeleton), ascii=True, desc="JSON to Acurus"):
             skeletons = []
             people = frame_info['skeleton']
             for p in people:
@@ -67,7 +69,7 @@ class Tracker:
     def acurus_to_skeleton(self, acurus_json):
         result = []
         max_frame = np.max([int(k) for k in acurus_json.keys()]) + 1
-        for i in range(max_frame):
+        for i in tqdm(range(max_frame), ascii=True, desc="Acurus to JSON"):
             i = str(i)
             skeletons = []
             if i in acurus_json.keys():
@@ -82,7 +84,8 @@ class Tracker:
                            'skeleton': skeletons})
         return result
 
-    def track(self, skeleton, process_dir, resolution, acurus_path='C:/research/AcurusTrack'):
+    def track(self, skeleton, resolution, acurus_path='C:/research/AcurusTrack'):
+        process_dir = path.join(acurus_path, 'process')
         Path(process_dir, 'acurus').mkdir(parents=True, exist_ok=True)
         pre_processed_path = path.join(process_dir, 'acurus', 'pre.json')
         write_json(self.skeleton_to_acurus(skeleton), pre_processed_path)
@@ -108,14 +111,19 @@ class Tracker:
         os.chdir(acurus_path)
         try:
             subprocess.check_call(shlex.split(cmd), universal_newlines=True)
-        except RuntimeError:
+        except:
             params['force'] = True
             args = ' '.join([f'--{k} {v}' for k, v in params.items()])
             cmd = f'python {path.join(acurus_path, "run.py")} {args}'.replace('\\', '/')
             print(f'Execution failed, trying with force: {cmd}')
-            subprocess.check_call(shlex.split(cmd), universal_newlines=True)
+            try:
+                subprocess.check_call(shlex.split(cmd), universal_newlines=True)
+            except:
+                print(f'Execution with force failed: {cmd}')
+                return skeleton
         finally:
             os.chdir(cwd)
 
         final_meta = read_json(path.join(save_dir, 'v', exp_name, 'result', 'result.json'))
+        shutil.rmtree(process_dir)
         return self.acurus_to_skeleton(final_meta)

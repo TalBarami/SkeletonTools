@@ -9,6 +9,7 @@ import os
 
 from utils import skeleton_utils, tools
 from utils.constants import LENGTH
+from utils.tools import write_pkl
 
 
 def gendata(
@@ -42,8 +43,7 @@ def gendata(
         fp[i, :, 0:data.shape[1], :, :] = data
         sample_label.append(label)
 
-    with open(label_out_path, 'wb') as f:
-        pickle.dump((sample_name, list(sample_label)), f)
+    write_pkl((sample_name, list(sample_label)), label_out_path)
 
 class JsonDataset(torch.utils.data.Dataset):
     """ Feeder for skeleton-based action recognition in kinetics-skeleton dataset

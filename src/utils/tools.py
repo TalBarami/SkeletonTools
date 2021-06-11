@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 from json import JSONDecodeError
 from os import path
 
@@ -20,6 +21,20 @@ def read_json(file):
 def write_json(j, dst):
     with open(dst, 'w') as f:
         json.dump(j, f)
+
+
+def read_pkl(file):
+    try:
+        with open(file, 'rb') as p:
+            return pickle.load(p)
+    except (OSError, UnicodeDecodeError, JSONDecodeError) as e:
+        print(f'Error while reading {file}: {e}')
+        raise e
+
+
+def write_pkl(p, dst):
+    with open(dst, 'wb') as f:
+        pickle.dump(p, f)
 
 
 def get_video_properties(video_path):

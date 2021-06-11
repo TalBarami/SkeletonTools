@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from utils import skeleton_utils
+from utils.tools import read_pkl
 
 
 class SkeletonFeeder(torch.utils.data.Dataset):
@@ -46,8 +47,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         # data: N C V T M
 
         # load label
-        with open(self.label_path, 'rb') as f:
-            self.sample_name, self.label = pickle.load(f)
+        self.sample_name, self.label = read_pkl(self.label_path)
 
         # load data
         if mmap:

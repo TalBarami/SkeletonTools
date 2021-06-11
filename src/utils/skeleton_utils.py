@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import random
 
-from constants import EPSILON
+from utils.constants import EPSILON
 
 
 def get_last_frame_id(data_numpy):
