@@ -1,4 +1,4 @@
-from openpose_layouts.openpose_layout import OpenPoseLayout
+from SkeletonTools.src.openpose_layouts.openpose_layout import OpenPoseLayout
 
 BODY_25_LAYOUT = OpenPoseLayout(
     'BODY_25',

@@ -1,4 +1,4 @@
-from openpose_layouts.openpose_layout import OpenPoseLayout
+from SkeletonTools.src.openpose_layouts.openpose_layout import OpenPoseLayout
 
 FACE_LAYOUT = OpenPoseLayout(
     'FACE',

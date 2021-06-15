@@ -6,44 +6,48 @@ from numpy.lib.format import open_memmap
 import numpy as np
 
 import os
+from os import path
 
-from utils import skeleton_utils, tools
-from utils.constants import LENGTH
-from utils.tools import write_pkl
+from SkeletonTools.src.openpose_layouts.body import BODY_25_LAYOUT
+from SkeletonTools.src.pipe_components.openpose_initializer import OpenposeInitializer
+from SkeletonTools.src.utils.constants import LENGTH
+from SkeletonTools.src.utils.tools import read_json, write_pkl
 
 
-# def gendata(
-#         data_path,
-#         label_path,
-#         data_out_path,
-#         label_out_path,
-#         in_channels=3,
-#         n_joints=25,
-#         num_person_in=5,
-#         num_person_out=1,
-#         max_frame=LENGTH):
-#     feeder = JsonDataset(data_path=data_path,
-#                          label_path=label_path,
-#                          n_joints=n_joints,
-#                          num_person_in=num_person_in,
-#                          num_person_out=num_person_out,
-#                          window_size=max_frame)
-#
-#     sample_name = feeder.sample_name
-#     sample_label = []
-#
-#     fp = open_memmap(data_out_path,
-#                      dtype='float32',
-#                      mode='w+',
-#                      shape=(len(sample_name), in_channels, max_frame, n_joints,
-#                             num_person_out))
-#
-#     for i, s in enumerate(sample_name):
-#         data, label = feeder[i]
-#         fp[i, :, 0:data.shape[1], :, :] = data
-#         sample_label.append(label)
-#
-#     write_pkl((sample_name, list(sample_label)), label_out_path)
+def gendata(
+        data_path,
+        label_path,
+        data_out_path,
+        label_out_path,
+        in_channels=3,
+        layout=BODY_25_LAYOUT,
+        num_person_in=5,
+        num_person_out=3,
+        max_frame=LENGTH):
+
+    initializer = OpenposeInitializer(layout)
+
+    n_joints = len(layout)
+    files = [f for f in os.listdir(data_path)]
+    labels_json = read_json(label_path)
+    labels_out = []
+
+    fp = open_memmap(data_out_path,
+                     dtype='float32',
+                     mode='w+',
+                     shape=(len(files), in_channels, max_frame, n_joints,
+                            num_person_out))
+
+    for i, file in enumerate(files):
+        json_data = read_json(path.join(data_path, file))
+        data = initializer.to_numpy(json_data)
+        fp[i, :, 0:data.shape[1], :, :] = data
+
+        basename = path.splitext(file)[0]
+        label = labels_json[basename]['label_index']
+        labels_out.append(label)
+
+    write_pkl((files, list(labels_out)), label_out_path)
 
 # class JsonDataset(torch.utils.data.Dataset):
 #     """ Feeder for skeleton-based action recognition in kinetics-skeleton dataset

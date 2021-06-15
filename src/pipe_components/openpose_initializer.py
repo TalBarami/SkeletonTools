@@ -11,9 +11,8 @@ from copy import deepcopy
 from PIL import Image
 from tqdm import tqdm
 
-from utils import tools
-from utils.constants import JSON_SOURCES, EPSILON, LENGTH
-from utils.tools import read_json
+from SkeletonTools.src.utils.constants import LENGTH, JSON_SOURCES, EPSILON
+from SkeletonTools.src.utils.tools import read_json, write_json
 
 
 class SkeletonSource(Enum):
@@ -21,14 +20,15 @@ class SkeletonSource(Enum):
     IMAGE = 'image_dir'
     WEBCAM = 'camera'
 
+
 class OpenposeInitializer:
-    def __init__(self, openpose_layout):
+    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=3):
         self.layout = openpose_layout
-        self.C = 3
-        self.T = LENGTH
+        self.C = in_channels
+        self.T = length
         self.V = len(self.layout)
-        self.num_person_in = 5
-        self.num_person_out = 3
+        self.num_person_in = num_person_in
+        self.num_person_out = num_person_out
 
     def make_skeleton(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO, render_pose=False, face=False, hand=False, open_pose_path='C:/research/openpose', write_video=None):
         Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
@@ -91,13 +91,13 @@ class OpenposeInitializer:
 
     # def collect_skeleton(self, skeleton_folder, dst_folder, resolution, tracking=True):  # TODO: Remove tracking, remove labeling
     #     skeleton = self.openpose_to_json(skeleton_folder)
-        # skeleton = self.normalize_pose(skeleton, resolution)
-        # if tracking:
-        #     skeleton = track(skeleton, skeleton_folder, resolution, self.layout)
-        # result = {'data': self.normalize_pose(skeleton, resolution),
-        #           'label': label_name,
-        #           'label_index': int(label_index)}
-        # tools.write_json(skeleton, path.join(dst_folder, f'{path.basename(skeleton_folder)}.json'))
+    # skeleton = self.normalize_pose(skeleton, resolution)
+    # if tracking:
+    #     skeleton = track(skeleton, skeleton_folder, resolution, self.layout)
+    # result = {'data': self.normalize_pose(skeleton, resolution),
+    #           'label': label_name,
+    #           'label_index': int(label_index)}
+    # tools.write_json(skeleton, path.join(dst_folder, f'{path.basename(skeleton_folder)}.json'))
 
     def prepare_skeleton(self, src_path, result_skeleton_dir, source_type=SkeletonSource.VIDEO, resolution=None, result_video_path=None, face=False, hand=False, tracking=True):
         basename = path.basename(src_path)
@@ -118,7 +118,7 @@ class OpenposeInitializer:
             #         with Image.open(sample_image) as img:
             #             resolution = img.size
             self.make_skeleton(src_path, openpose_output_path, source_type=source_type, write_video=result_video_path, face=face, hand=hand)
-            tools.write_json(self.openpose_to_json(openpose_output_path), path.join(result_skeleton_dir, f'{basename_no_ext}.json'))
+            write_json(self.openpose_to_json(openpose_output_path), path.join(result_skeleton_dir, f'{basename_no_ext}.json'))
             # shutil.rmtree(openpose_output_path)
         except Exception as e:
             print(f'Error creating skeleton from {src_path}: {e}')

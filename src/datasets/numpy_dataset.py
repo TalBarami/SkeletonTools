@@ -3,8 +3,8 @@ import pickle
 import numpy as np
 import torch
 
-from utils import skeleton_utils
-from utils.tools import read_pkl
+from SkeletonTools.src.utils import skeleton_utils
+from SkeletonTools.src.utils.tools import read_pkl
 
 
 class SkeletonFeeder(torch.utils.data.Dataset):

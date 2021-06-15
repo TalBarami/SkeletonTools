@@ -1,5 +1,3 @@
-import numpy as np
-
 class OpenPoseLayout:
     def __init__(self, name, center, joints, pairs):
         self.name = name

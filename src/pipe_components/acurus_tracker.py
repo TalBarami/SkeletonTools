@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from openpose_layouts.openpose_layout import OpenPoseLayout
-from utils.tools import read_json, write_json
+from SkeletonTools.src.openpose_layouts.openpose_layout import OpenPoseLayout
+from SkeletonTools.src.utils.tools import read_json, write_json
 
 
 class AcurusTracker:

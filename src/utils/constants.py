@@ -1,8 +1,8 @@
 import matplotlib.colors as mcolors
 
-from openpose_layouts.body import BODY_25_LAYOUT
-from openpose_layouts.face import FACE_LAYOUT
-from openpose_layouts.hand import HAND_LAYOUT
+from SkeletonTools.src.openpose_layouts.body import BODY_25_LAYOUT
+from SkeletonTools.src.openpose_layouts.face import FACE_LAYOUT
+from SkeletonTools.src.openpose_layouts.hand import HAND_LAYOUT
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Other', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
