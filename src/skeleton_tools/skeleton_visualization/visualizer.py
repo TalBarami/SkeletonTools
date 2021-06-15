@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 
-from SkeletonTools.src.utils.constants import COLORS, JSON_SOURCES, EPSILON
-from SkeletonTools.src.utils.skeleton_utils import bounding_box
+from skeleton_tools.utils.constants import COLORS, JSON_SOURCES, EPSILON
+from skeleton_tools.utils.skeleton_utils import bounding_box
 
 
 class Visualizer:

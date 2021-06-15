@@ -1,7 +1,7 @@
-from SkeletonTools.src.openpose_layouts.body import BODY_25_LAYOUT
-from SkeletonTools.src.openpose_layouts.face import FACE_LAYOUT
-from SkeletonTools.src.openpose_layouts.hand import HAND_LAYOUT
-from SkeletonTools.src.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
+from skeleton_tools.openpose_layouts.face import FACE_LAYOUT
+from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
+from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
 
 
 def combine_layouts(layouts):

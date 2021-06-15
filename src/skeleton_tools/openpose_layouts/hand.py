@@ -1,4 +1,4 @@
-from SkeletonTools.src.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
 
 HAND_LAYOUT = OpenPoseLayout(
     'HAND',

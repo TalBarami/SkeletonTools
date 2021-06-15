@@ -11,8 +11,8 @@ from copy import deepcopy
 from PIL import Image
 from tqdm import tqdm
 
-from SkeletonTools.src.utils.constants import LENGTH, JSON_SOURCES, EPSILON
-from SkeletonTools.src.utils.tools import read_json, write_json
+from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON
+from skeleton_tools.utils.tools import read_json, write_json
 
 
 class SkeletonSource(Enum):

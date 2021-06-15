@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 from os import path
 
-from SkeletonTools.src.utils.tools import read_json, write_json
+from skeleton_tools.utils.tools import read_json, write_json
 
 
 class Segmentor:

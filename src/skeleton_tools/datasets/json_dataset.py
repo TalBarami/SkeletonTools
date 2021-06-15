@@ -8,10 +8,10 @@ import numpy as np
 import os
 from os import path
 
-from SkeletonTools.src.openpose_layouts.body import BODY_25_LAYOUT
-from SkeletonTools.src.pipe_components.openpose_initializer import OpenposeInitializer
-from SkeletonTools.src.utils.constants import LENGTH
-from SkeletonTools.src.utils.tools import read_json, write_pkl
+from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
+from skeleton_tools.pipe_components.openpose_initializer import OpenposeInitializer
+from skeleton_tools.utils.constants import LENGTH
+from skeleton_tools.utils.tools import read_json, write_pkl
 
 
 def gendata(
@@ -25,7 +25,7 @@ def gendata(
         num_person_out=3,
         max_frame=LENGTH):
 
-    initializer = OpenposeInitializer(layout)
+    initializer = OpenposeInitializer(layout, in_channels=in_channels, length=max_frame, num_person_in=num_person_in, num_person_out=num_person_out)
 
     n_joints = len(layout)
     files = [f for f in os.listdir(data_path)]
