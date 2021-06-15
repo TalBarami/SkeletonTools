@@ -28,7 +28,7 @@ class OpenposeInitializer:
         self.T = LENGTH
         self.V = len(self.layout)
         self.num_person_in = 5
-        self.num_person_out = 2
+        self.num_person_out = 3
 
     def make_skeleton(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO, render_pose=False, face=False, hand=False, open_pose_path='C:/research/openpose', write_video=None):
         Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
