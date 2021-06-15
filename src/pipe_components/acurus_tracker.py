@@ -14,8 +14,9 @@ from SkeletonTools.src.utils.tools import read_json, write_json
 
 
 class AcurusTracker:
-    def __init__(self, skeleton_layout: OpenPoseLayout):
+    def __init__(self, skeleton_layout: OpenPoseLayout, acurus_path='C:/research/AcurusTrack'):
         self.skeleton_layout = skeleton_layout
+        self.acurus_path = acurus_path
         self.special_joints = {
             'MidHip': [self.skeleton_layout.joint('MidHip')],
             'Neck': [self.skeleton_layout.joint('Neck')],
@@ -84,8 +85,8 @@ class AcurusTracker:
                            'skeleton': skeletons})
         return result
 
-    def track(self, skeleton, resolution, acurus_path='C:/research/AcurusTrack'):
-        process_dir = path.join(acurus_path, 'process')
+    def track(self, skeleton, resolution):
+        process_dir = path.join(self.acurus_path, 'process')
         Path(process_dir, 'acurus').mkdir(parents=True, exist_ok=True)
         pre_processed_path = path.join(process_dir, 'acurus', 'pre.json')
         write_json(self.skeleton_to_acurus(skeleton), pre_processed_path)
