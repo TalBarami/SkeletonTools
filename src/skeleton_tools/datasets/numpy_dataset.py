@@ -70,22 +70,22 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         data_numpy = np.array(self.data[index])
         label = self.label[index]
 
+        # processing
+        # if self.random_mirror and np.random.rand() > 0.5:
+        #     data_numpy = skeleton_utils.mirror_sample(data_numpy)
+        # if self.random_reverse and np.random.rand() > 0.5:
+        #     data_numpy = skeleton_utils.reverse_sample(data_numpy)
+        # if self.random_positioning and np.random.rand() > 0.5:
+        #     data_numpy = skeleton_utils.random_positioning(data_numpy)
+
+        # if self.random_choose:
+        #     data_numpy = skeleton_utils.random_choose(data_numpy, self.window_size)
+        # elif self.window_size > 0:
+        #     data_numpy = skeleton_utils.auto_pading(data_numpy, self.window_size)
+        # if self.random_move:
+        #     data_numpy = skeleton_utils.random_move(data_numpy)
+
         if self.random_repetitions:
             data_numpy, label = skeleton_utils.random_repetition(data_numpy, self.random_repetitions)
-
-        # processing
-        if self.random_mirror and np.random.rand() > 0.5:
-            data_numpy = skeleton_utils.mirror_sample(data_numpy)
-        if self.random_reverse and np.random.rand() > 0.5:
-            data_numpy = skeleton_utils.reverse_sample(data_numpy)
-        if self.random_positioning:
-            data_numpy = skeleton_utils.random_positioning(data_numpy)
-
-        if self.random_choose:
-            data_numpy = skeleton_utils.random_choose(data_numpy, self.window_size)
-        elif self.window_size > 0:
-            data_numpy = skeleton_utils.auto_pading(data_numpy, self.window_size)
-        if self.random_move:
-            data_numpy = skeleton_utils.random_move(data_numpy)
 
         return data_numpy, label

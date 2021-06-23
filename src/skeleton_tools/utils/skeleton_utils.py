@@ -169,27 +169,32 @@ def pad_reversed(data_numpy):
 
 def random_repetition(data_numpy, rep_generator):
     label, amplitude, cycle = rep_generator()
-    return add_repetitive_noise(data_numpy, amplitude, cycle, 0), label
+    if label:
+        data_numpy = add_repetitive_noise(data_numpy, amplitude, cycle, 0)
+    return data_numpy, label
 
 
 def apply_noise(X, c, amplitude, cycle, offset, size):
+    r = X.copy()
     F = np.arange(X.shape[0])
-    X = X + amplitude * size * np.sin(offset + 2 * np.pi * F / cycle)
-    X[c < EPSILON] = 0
-    return np.clip(np.round(X, 8), -1, 1)
+    r += amplitude * size * np.sin(offset + 2 * np.pi * F / cycle)
+    r[c < EPSILON] = 0
+    return np.clip(np.round(r, 8), -1, 1)
 
 
-def get_interval(box, axis):
-    return box[axis]['max'] - box[axis]['min']
+def get_interval(box):
+    a = np.array((box[0]['max'], box[1]['max']))
+    b = np.array((box[0]['min'], box[1]['min']))
+    return np.linalg.norm(a-b)
 
 
 def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
     _, F, _, M = data_numpy.shape
-    joints = [4, 7]
+    joints = [0, 4, 7]
     axis = 1
 
     for p in range(M):
-        lengths = np.array([get_interval(bounding_box(data_numpy[:2, f, :, p], data_numpy[2, f, :, p]), axis) for f in range(F)])
+        lengths = np.array([get_interval(bounding_box(data_numpy[:2, f, :, p], data_numpy[2, f, :, p])) for f in range(F)])
 
         for j in joints:
             v = data_numpy[axis, :, j, p]

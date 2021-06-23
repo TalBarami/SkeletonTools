@@ -3,10 +3,16 @@ import os
 import pickle
 from json import JSONDecodeError
 from os import path
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
 import cv2
+
+
+def init_directories(*dirs):
+    for dir in dirs:
+        Path(dir).mkdir(parents=True, exist_ok=True)
 
 
 def read_json(file):

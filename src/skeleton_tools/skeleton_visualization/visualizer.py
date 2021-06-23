@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 from skeleton_tools.utils.constants import COLORS, JSON_SOURCES, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
 
 
 class Visualizer:
-
     def draw_json_skeletons(self, frame, skeletons, resolution, display_pid=True, display_bbox=True, is_normalized=False):
         width, height = resolution
         for i, s in enumerate(skeletons):
@@ -37,8 +37,31 @@ class Visualizer:
             color = (0, 0, 255)
         for (v1, v2) in skeleton_layout.pairs():
             if score[v1] > epsilon and score[v2] > epsilon:
-                cv2.line(image, pose[v1], pose[v2], color, thickness=2, lineType=cv2.LINE_AA)
+                cv2.line(image, tuple(pose[v1]), tuple(pose[v2]), color, thickness=2, lineType=cv2.LINE_AA)
         for i, (x, y) in enumerate(pose):
             if score[i] > epsilon:
                 joint_size = join_emphasize[i] if join_emphasize else 2
                 cv2.circle(image, (x, y), joint_size, (0, 60, 255), thickness=2)
+
+    def make_video(self, video_path, skeleton, dst_file, delay=0):
+        cap = cv2.VideoCapture(video_path)
+        width, height, length, fps = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),cap.get(cv2.CAP_PROP_FPS)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(dst_file, fourcc, fps, (width, height))
+
+        curr_frame = 0
+        with tqdm(total=length, ascii=True, desc="Writing video result") as pbar:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    if curr_frame >= delay:
+                        self.draw_json_skeletons(frame, skeleton[curr_frame - delay]['skeleton'], (width, height), is_normalized=False)
+                    out.write(frame)
+                    curr_frame += 1
+                    pbar.update(1)
+                else:
+                    break
+        if cap is not None:
+            cap.release()
+        if out is not None:
+            out.release()

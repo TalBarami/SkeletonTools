@@ -11,6 +11,7 @@ from copy import deepcopy
 from PIL import Image
 from tqdm import tqdm
 
+from skeleton_tools.skeleton_visualization.visualizer import Visualizer
 from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON
 from skeleton_tools.utils.tools import read_json, write_json
 
@@ -29,8 +30,9 @@ class OpenposeInitializer:
         self.V = len(self.layout)
         self.num_person_in = num_person_in
         self.num_person_out = num_person_out
+        self.visualizer = Visualizer()
 
-    def make_skeleton(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO, render_pose=False, face=False, hand=False, open_pose_path='C:/research/openpose', write_video=None):
+    def make_skeleton(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO, render_pose=False, face=False, hand=False, open_pose_path='C:/research/openpose'):
         Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
         params = {
             source_type.value: f'\"{src_path}\"',
@@ -39,10 +41,7 @@ class OpenposeInitializer:
             'display': 0,
             'render_pose': int(render_pose)
         }
-        if write_video:
-            params['write_video'] = f'\"{write_video}\"'
-            if source_type == SkeletonSource.IMAGE:
-                params['write_video_fps'] = 30.0
+
         if face:
             params['face'] = ''
             params['net_resolution'] = '256x256'
@@ -99,7 +98,7 @@ class OpenposeInitializer:
     #           'label_index': int(label_index)}
     # tools.write_json(skeleton, path.join(dst_folder, f'{path.basename(skeleton_folder)}.json'))
 
-    def prepare_skeleton(self, src_path, result_skeleton_dir, source_type=SkeletonSource.VIDEO, resolution=None, result_video_path=None, face=False, hand=False, tracking=True):
+    def prepare_skeleton(self, src_path, result_skeleton_dir, source_type=SkeletonSource.VIDEO, result_video_path=None, face=False, hand=False):
         basename = path.basename(src_path)
         basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
 
@@ -117,8 +116,11 @@ class OpenposeInitializer:
             #         sample_image = path.join(src_path, os.listdir(src_path)[0])
             #         with Image.open(sample_image) as img:
             #             resolution = img.size
-            self.make_skeleton(src_path, openpose_output_path, source_type=source_type, write_video=result_video_path, face=face, hand=hand)
-            write_json(self.openpose_to_json(openpose_output_path), path.join(result_skeleton_dir, f'{basename_no_ext}.json'))
+            # self.make_skeleton(src_path, openpose_output_path, source_type=source_type, face=face, hand=hand)
+            data = self.openpose_to_json(openpose_output_path)
+            write_json(data, path.join(result_skeleton_dir, f'{basename_no_ext}.json'))
+            # if result_video_path:
+            #     self.visualizer.make_video(src_path, data, path.join(result_video_path, f'{basename}.avi'))
             # shutil.rmtree(openpose_output_path)
         except Exception as e:
             print(f'Error creating skeleton from {src_path}: {e}')
@@ -140,6 +142,16 @@ class OpenposeInitializer:
                     x, y = xy[0], xy[1]
                     s[src['name']] = [e for l in zip(x, y) for e in l]
         return result
+
+    def revert(self, data_numpy, resolution):
+        x = data_numpy.copy()
+        width, height = resolution
+        x[:2] += 0.5
+        x[0][x[2] < EPSILON] = 0
+        x[1][x[2] < EPSILON] = 0
+        x[0] *= width
+        x[1] *= height
+        return x
 
     def to_numpy(self, skeleton):
         data_numpy = np.zeros((self.C, self.T, self.V, self.num_person_in))
