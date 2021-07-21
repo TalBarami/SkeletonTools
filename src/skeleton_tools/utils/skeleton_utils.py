@@ -182,9 +182,9 @@ def apply_noise(X, c, amplitude, cycle, offset, size):
     return np.clip(np.round(r, 8), -1, 1)
 
 
-def get_interval(box):
-    a = np.array((box[0]['max'], box[1]['max']))
-    b = np.array((box[0]['min'], box[1]['min']))
+def get_interval(c, w, h):
+    a = np.array(c) + np.array([w, h])
+    b = np.array(c) - np.array([w, h])
     return np.linalg.norm(a-b)
 
 
@@ -204,26 +204,44 @@ def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
     return data_numpy
 
 
-def add_repetitive_noise_json(json_file, amplitude, cycle, offset):
-    j_copy = deepcopy(json_file)
-    j_copy['data'] = j_copy['data'][1:]
-    pose = [f['skeleton'][0]['pose'] for f in j_copy['data']]
-    xyc = np.array([
-        np.array([p[::2] for p in pose]),
-        np.array([p[1::2] for p in pose]),
-        np.array([f['skeleton'][0]['score'] for f in j_copy['data']])
-    ])
-    _, F, _ = xyc.shape
-    axis = 1
-    joints = [4, 7]
-    for j in joints:
-        intervals = np.array([get_interval(bounding_box(xyc[:2, f, :], xyc[2, f, :]), axis) for f in range(F)])
-        xyc[axis, :, j] = apply_noise(xyc[axis, :, j], xyc[2, :, j], amplitude, cycle, offset, intervals)
-    for i, p in enumerate(pose):
-        p[0::2] = xyc[0, i, :]
-        p[1::2] = xyc[1, i, :]
-    return j_copy
+# def add_repetitive_noise_json(json_file, amplitude, cycle, offset):
+#     j_copy = deepcopy(json_file)
+#     j_copy['data'] = j_copy['data'][1:]
+#     pose = [f['skeleton'][0]['pose'] for f in j_copy['data']]
+#     xyc = np.array([
+#         np.array([p[::2] for p in pose]),
+#         np.array([p[1::2] for p in pose]),
+#         np.array([f['skeleton'][0]['score'] for f in j_copy['data']])
+#     ])
+#     _, F, _ = xyc.shape
+#     axis = 1
+#     joints = [4, 7]
+#     for j in joints:
+#         intervals = np.array([get_interval(bounding_box(xyc[:2, f, :], xyc[2, f, :]), axis) for f in range(F)])
+#         xyc[axis, :, j] = apply_noise(xyc[axis, :, j], xyc[2, :, j], amplitude, cycle, offset, intervals)
+#     for i, p in enumerate(pose):
+#         p[0::2] = xyc[0, i, :]
+#         p[1::2] = xyc[1, i, :]
+#     return j_copy
 
+
+# def bounding_box(pose, score):
+#     x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
+#     if not any(x):
+#         x = np.array([0])
+#     if not any(y):
+#         y = np.array([0])
+#     box = {
+#         0: {
+#             'min': np.min(x),
+#             'max': np.max(x),
+#         },
+#         1: {
+#             'min': np.min(y),
+#             'max': np.max(y)
+#         }
+#     }
+#     return box
 
 def bounding_box(pose, score):
     x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
@@ -231,17 +249,26 @@ def bounding_box(pose, score):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
-    box = {
-        0: {
-            'min': np.min(x),
-            'max': np.max(x),
-        },
-        1: {
-            'min': np.min(y),
-            'max': np.max(y)
-        }
-    }
-    return box
+    w = np.max(x) - np.min(x) / 2
+    h = np.max(y) - np.min(y) / 2
+    c = (np.min(x) + w, np.min(y) + h)
+    return c, w, h
+
+    # if not any(x):
+    #     x = np.array([0])
+    # if not any(y):
+    #     y = np.array([0])
+    # box = {
+    #     0: {
+    #         'min': np.min(x),
+    #         'max': np.max(x),
+    #     },
+    #     1: {
+    #         'min': np.min(y),
+    #         'max': np.max(y)
+    #     }
+    # }
+    # return box
 
 
 def openpose_match(data_numpy):
