@@ -225,7 +225,7 @@ def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
 #     return j_copy
 
 
-# def bounding_box(pose, score):
+# def bounding_box2(pose, score):
 #     x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
 #     if not any(x):
 #         x = np.array([0])
@@ -249,26 +249,10 @@ def bounding_box(pose, score):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
-    w = np.max(x) - np.min(x) / 2
-    h = np.max(y) - np.min(y) / 2
-    c = (np.min(x) + w, np.min(y) + h)
-    return c, w, h
+    h = (np.max(y) - np.min(y)) / 2
+    w = (np.max(x) - np.min(x)) / 2
+    return np.array((np.min(x) + w, np.min(y) + h)).astype(int), np.array((w, h)).astype(int)
 
-    # if not any(x):
-    #     x = np.array([0])
-    # if not any(y):
-    #     y = np.array([0])
-    # box = {
-    #     0: {
-    #         'min': np.min(x),
-    #         'max': np.max(x),
-    #     },
-    #     1: {
-    #         'min': np.min(y),
-    #         'max': np.max(y)
-    #     }
-    # }
-    # return box
 
 
 def openpose_match(data_numpy):
