@@ -55,10 +55,14 @@ class Visualizer:
                         y_center = y.min() * 0.9
                         cv2.putText(img, str(pid), (int(x_center), int(y_center)), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2, cv2.LINE_AA)
                     if display_bbox:
-                        bbox = bounding_box(pose, c)
-                        bbox = (bbox[0]['min'], bbox[1]['min']), (bbox[0]['max'], bbox[1]['max'])
-                        cv2.rectangle(img, bbox[0], bbox[1], (255, 255, 255), thickness=1)
-        return img
+                        self.draw_bbox(frame, bounding_box(pose, c))
+                        # bbox = bounding_box(pose, c)
+                        # bbox = (bbox[0]['min'], bbox[1]['min']), (bbox[0]['max'], bbox[1]['max'])
+                        # cv2.rectangle(frame, bbox[0], bbox[1], (255, 255, 255), thickness=1)
+
+    def draw_bbox(self, frame, bbox):
+        center, r = bbox
+        cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=(255, 255, 255), thickness=1)
 
     def blur_area(self, frame, c, r):
         c_mask = np.zeros(frame.shape[:2], np.uint8)
