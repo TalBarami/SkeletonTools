@@ -243,15 +243,19 @@ def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
 #     }
 #     return box
 
+def box_distance(b1, b2):
+    c1, _ = b1
+    c2, _ = b2
+    return np.linalg.norm(c1 - c2)
+
 def bounding_box(pose, score):
     x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
     if not any(x):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
-    h = (np.max(y) - np.min(y)) / 2
-    w = (np.max(x) - np.min(x)) / 2
-    return np.array((np.min(x) + w, np.min(y) + h)).astype(int), np.array((w, h)).astype(int)
+    w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
+    return np.array((np.min(x) + w / 2, np.min(y) + h / 2)).astype(int), np.array((w, h)).astype(int)
 
 
 
