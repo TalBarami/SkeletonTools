@@ -27,6 +27,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
                  random_reverse=False,
                  random_choose=False,
                  random_move=False,
+                 interpolate=False,
                  window_size=-1,
                  debug=False,
                  mmap=True):
@@ -39,6 +40,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         self.random_reverse = random_reverse
         self.random_choose = random_choose
         self.random_move = random_move
+        self.interpolate = interpolate
         self.window_size = window_size
 
         self.load_data(mmap)
@@ -71,21 +73,24 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         label = self.label[index]
 
         # processing
-        # if self.random_mirror and np.random.rand() > 0.5:
-        #     data_numpy = skeleton_utils.mirror_sample(data_numpy)
-        # if self.random_reverse and np.random.rand() > 0.5:
-        #     data_numpy = skeleton_utils.reverse_sample(data_numpy)
-        # if self.random_positioning and np.random.rand() > 0.5:
-        #     data_numpy = skeleton_utils.random_positioning(data_numpy)
+        if self.random_mirror and np.random.rand() > 0.5:
+            data_numpy = skeleton_utils.mirror_sample(data_numpy)
+        if self.random_reverse and np.random.rand() > 0.5:
+            data_numpy = skeleton_utils.reverse_sample(data_numpy)
+        if self.random_positioning and np.random.rand() > 0.5:
+            data_numpy = skeleton_utils.random_positioning(data_numpy)
+        if self.interpolate:
+            data_numpy = skeleton_utils.interpolate(data_numpy)
 
-        # if self.random_choose:
-        #     data_numpy = skeleton_utils.random_choose(data_numpy, self.window_size)
-        # elif self.window_size > 0:
-        #     data_numpy = skeleton_utils.auto_pading(data_numpy, self.window_size)
-        # if self.random_move:
-        #     data_numpy = skeleton_utils.random_move(data_numpy)
+        if self.random_choose:
+            data_numpy = skeleton_utils.random_choose(data_numpy, self.window_size)
+        elif self.window_size > 0:
+            data_numpy = skeleton_utils.auto_pading(data_numpy, self.window_size)
+        if self.random_move:
+            data_numpy = skeleton_utils.random_move(data_numpy)
 
         if self.random_repetitions:
             data_numpy, label = skeleton_utils.random_repetition(data_numpy, self.random_repetitions)
+
 
         return data_numpy, label

@@ -24,3 +24,6 @@ class OpenPoseLayout:
 
     def pairs(self):
         return self._pose_pairs
+
+    def neighbors(self, i):
+        return []

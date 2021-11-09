@@ -2,8 +2,13 @@ from copy import deepcopy
 
 import numpy as np
 import random
+import pandas as pd
+from scipy.interpolate import interp1d
+from scipy.fftpack import fft
 
-from skeleton_tools.utils.constants import EPSILON
+from tqdm import tqdm
+
+from skeleton_tools.utils.constants import EPSILON, JSON_SOURCES
 
 
 def get_last_frame_id(data_numpy):
@@ -140,7 +145,7 @@ def random_positioning(data_numpy):
             1: (-0.5 - np.clip(x[1, :, :, m].min(), -0.5, 1), 0.5 - np.clip(x[1, :, :, m].max(), -1, 0.5)),
         }
 
-        for a in range(C - 1):
+        for a in range(2):
             x[a, :, :, m] += np.random.uniform(*intervals[a])
     return x
 
@@ -204,6 +209,89 @@ def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
     return data_numpy
 
 
+def centralize_json(pose_json):
+    result = deepcopy(pose_json)
+    boxes = [bounding_box((s['pose'][::2], s['pose'][1::2]), s['pose_score']) for s in [d['skeleton'][0] for d in result if len(d['skeleton']) > 0]]
+    center, size = None, None
+    if any(boxes):
+        try:
+            size = np.median(np.array([s for c, s in boxes]).T, axis=1)
+            center, _ = boxes[0]
+        except Exception as e:
+            print('Error')
+    for d in tqdm(result, ascii=True, desc='Centralizing'):
+        for s in d['skeleton']:
+            if center is None:
+                center, _ = bounding_box((s['pose'][::2], s['pose'][1::2]), s['pose_score'])
+            if size is None:
+                _, size = bounding_box((s['pose'][::2], s['pose'][1::2]), s['pose_score'])
+            for src in [src for src in JSON_SOURCES if src['name'] in s.keys()]:
+                key = src['name']
+                c = np.array(s[f'{key}_score'])
+                xy = np.array([s[key][::2], s[key][1::2]]).T
+                xy -= center
+                xy /= size
+                xy[c < EPSILON] = 0
+                s[src['name']] = [e for l in zip(xy[:, 0], xy[:, 1]) for e in l]
+    return result
+
+def decentralize_json(pose_json, resolution):
+    result = deepcopy(pose_json)
+    for d in tqdm(result, ascii=True, desc='Centralizing'):
+        for s in d['skeleton']:
+            for src in [src for src in JSON_SOURCES if src['name'] in s.keys()]:
+                key = src['name']
+                c = np.array(s[f'{key}_score'])
+                xy = np.array([s[key][::2], s[key][1::2]]).T
+                xy += resolution / 2
+                xy *= resolution / 10
+                xy[c < EPSILON] = 0
+                s[src['name']] = [e for l in zip(xy[:, 0], xy[:, 1]) for e in l]
+    return result
+
+
+def normalize_json(pose_json, resolution, centralize=True):
+    result = deepcopy(pose_json)
+    width, height = resolution
+    for d in tqdm(result, ascii=True, desc='Normalizing & Centralizing'):
+        for s in d['skeleton']:
+            for src in [src for src in JSON_SOURCES if src['name'] in s.keys()]:
+                key = src['name']
+                c = np.array(s[f'{key}_score'])
+                xy = np.array([s[key][::2], s[key][1::2]])
+                xy = np.round((xy.T / np.array([width, height])).T - 0.5 if centralize else 0, 8)
+                xy.T[c < EPSILON] = 0
+                x, y = xy[0], xy[1]
+                s[src['name']] = [e for l in zip(x, y) for e in l]
+    return result
+
+def denormalize_json(pose_json, resolution, centralized=True):
+    result = deepcopy(pose_json)
+    for d in tqdm(result, ascii=True, desc='Normalizing & Centralizing'):
+        for s in d['skeleton']:
+            for src in [src for src in JSON_SOURCES if src['name'] in s.keys()]:
+                key = src['name']
+                c = np.array(s[f'{key}_score'])
+                xy = (np.array([s[key][::2], s[key][1::2]]) + (0.5 if centralized else 0)).T
+                xy *= resolution
+                xy[c < EPSILON] = 0
+                s[src['name']] = [e for l in zip(xy[:, 0], xy[:, 1]) for e in l]
+    return result
+
+def denormalize_numpy(data_numpy, resolution):
+    x = data_numpy.copy()
+    width, height = resolution
+    x[:2] += 0.5
+    x[0][x[2] < EPSILON] = 0
+    x[1][x[2] < EPSILON] = 0
+    x[0] *= width
+    x[1] *= height
+    return x
+
+def to_fft(data_numpy):
+    C = data_numpy.shape[0]
+    return np.abs(fft(data_numpy[:, :C-1, :, :, :], axis=2))
+
 # def add_repetitive_noise_json(json_file, amplitude, cycle, offset):
 #     j_copy = deepcopy(json_file)
 #     j_copy['data'] = j_copy['data'][1:]
@@ -249,13 +337,14 @@ def box_distance(b1, b2):
     return np.linalg.norm(c1 - c2)
 
 def bounding_box(pose, score):
+    pose, score = np.array(pose), np.array(score)
     x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
     if not any(x):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
     w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
-    return np.array((np.min(x) + w / 2, np.min(y) + h / 2)).astype(int), np.array((w, h)).astype(int)
+    return np.array((np.min(x) + w / 2, np.min(y) + h / 2)), np.array((w, h))
 
 
 
@@ -302,3 +391,23 @@ def openpose_match(data_numpy):
     data_numpy = data_numpy[:, :, :, rank]
 
     return data_numpy
+
+
+def interpolate(data_numpy):
+    C, T, V, M = data_numpy.shape
+    x = np.copy(data_numpy)
+    for v in range(V):
+        for m in range(M):
+            scores = data_numpy[2, :, v, m]
+            if (scores < 0.4).mean() > 0.3:
+                continue
+            for c in range(C - 1):
+                # y = data_numpy[c, :, v, m]
+                # y[scores < 0.4] = np.nan
+                # x[c, :, v, m] = interp1d(np.arange(len(y)), y, kind='cubic')
+                y = data_numpy[c, :, v, m]
+                s = pd.Series(y)
+                s[scores < 0.2] = np.nan
+                y = s.interpolate(method='spline', order=2, limit_direction='both').to_numpy()
+                x[c, :, v, m] = y
+    return x

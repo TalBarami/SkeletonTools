@@ -11,8 +11,10 @@ from copy import deepcopy
 from PIL import Image
 from tqdm import tqdm
 
+from skeleton_tools.pipe_components.yolo_v5_child_detector import ChildDetector
 from skeleton_tools.skeleton_visualization.visualizer import Visualizer
 from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON
+from skeleton_tools.utils.skeleton_utils import normalize_json
 from skeleton_tools.utils.tools import read_json, write_json
 
 
@@ -31,15 +33,16 @@ class OpenposeInitializer:
         self.num_person_in = num_person_in
         self.num_person_out = num_person_out
         self.visualizer = Visualizer()
+        self.open_pose_path='C:/research/openpose'
 
-    def make_skeleton(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO, render_pose=False, open_pose_path='C:/research/openpose'):
+    def _exec_openpose(self, src_path, skeleton_dst=None, source_type=SkeletonSource.VIDEO):
         Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
         params = {
             source_type.value: f'\"{src_path}\"',
             'model_pose': self.layout.model_pose,
             'write_json': f'\"{skeleton_dst}\"',
             'display': 0,
-            'render_pose': int(render_pose)
+            'render_pose': 0
         }
 
         if self.layout.face:
@@ -53,7 +56,7 @@ class OpenposeInitializer:
         args = ' '.join([f'--{k} {v}' for k, v in params.items()])
 
         cwd = os.getcwd()
-        os.chdir(open_pose_path)
+        os.chdir(self.open_pose_path)
         cmd = f'build_windows/x64/Release/OpenPoseDemo.exe {args}'
         print(f'Executing: {cmd}')
         try:
@@ -77,8 +80,8 @@ class OpenposeInitializer:
             skeletons = []
             frame_info = read_json(file)
             people = frame_info['people']
-            for p in people:
-                skeleton = {'person_id': p['person_id']}
+            for pdx, p in enumerate(people):
+                skeleton = {'person_id': p['person_id'] if p['person_id'] != [-1] else pdx}
                 for source in [s for s in JSON_SOURCES if s['openpose'] in p.keys()]:
                     pose, score = collect_data(p[source['openpose']])
                     skeleton[source['name']] = pose
@@ -98,52 +101,33 @@ class OpenposeInitializer:
     #           'label_index': int(label_index)}
     # tools.write_json(skeleton, path.join(dst_folder, f'{path.basename(skeleton_folder)}.json'))
 
-    def prepare_skeleton(self, src_path, result_skeleton_dir, out_name=None, source_type=SkeletonSource.VIDEO, result_video_path=None):
+    def prepare_skeleton(self, src_path, result_skeleton_dir=None, result_video_dir=None, source_type=SkeletonSource.VIDEO, out_name=None):
         basename = path.basename(src_path)
         basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
 
-        openpose_output_path = path.join(result_skeleton_dir, 'openpose', basename_no_ext)
-
-        # if result_video_path is not None:
-        #     Path(path.join(result_video_path)).mkdir(parents=True, exist_ok=True)
-        #     result_video_path = path.join(result_video_path, f'{basename_no_ext}.avi')
+        openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_video_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
 
         try:
-            # if resolution is None:
-            #     if source_type == SkeletonSource.VIDEO:
-            #         resolution, _, _ = tools.get_video_properties(src_path)
-            #     else:
-            #         sample_image = path.join(src_path, os.listdir(src_path)[0])
-            #         with Image.open(sample_image) as img:
-            #             resolution = img.size
-            # self.make_skeleton(src_path, openpose_output_path, source_type=source_type, face=face, hand=hand)
+            self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
-            write_json(data, path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json'))
-            # if result_video_path:
-            #     self.visualizer.make_video(src_path, data, path.join(result_video_path, f'{basename}.avi'))
+            if result_skeleton_dir:
+                result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
+                write_json(data, result_path)
+            if result_video_dir:
+                result_video_path = path.join(result_video_dir, out_name if out_name else f'{basename_no_ext}.avi')
+                self.visualizer.make_video(src_path, data, result_video_path)
             # shutil.rmtree(openpose_output_path)
+            return data
         except Exception as e:
             print(f'Error creating skeleton from {src_path}: {e}')
             raise e
-        # finally:
-        #     shutil.rmtree(openpose_output_path)
+        finally:
+            shutil.rmtree(openpose_output_path)
 
     def normalize(self, pose_json, resolution):
-        result = deepcopy(pose_json)
-        width, height = resolution
-        for d in tqdm(result, ascii=True, desc='Normalizing & Centralizing'):
-            for s in d['skeleton']:
-                for src in [src for src in JSON_SOURCES if src['name'] in s.keys()]:
-                    key = src['name']
-                    c = np.array(s[f'{key}_score'])
-                    xy = np.array([s[key][::2], s[key][1::2]])
-                    xy = np.round((xy.T / np.array([width, height])).T - 0.5, 8)
-                    xy.T[c < EPSILON] = 0
-                    x, y = xy[0], xy[1]
-                    s[src['name']] = [e for l in zip(x, y) for e in l]
-        return result
+        return normalize_json(pose_json, resolution)
 
-    def revert(self, data_numpy, resolution):
+    def denormalize(self, data_numpy, resolution):
         x = data_numpy.copy()
         width, height = resolution
         x[:2] += 0.5
@@ -155,9 +139,8 @@ class OpenposeInitializer:
 
     def to_numpy(self, skeleton):
         data_numpy = np.zeros((self.C, self.T, self.V, self.num_person_in))
-        for frame_info in tqdm(skeleton, ascii=True, desc='To numpy'):
-            frame_index = int(frame_info['frame_index'])
-            if frame_index == self.T:
+        for i, frame_info in tqdm(enumerate(skeleton), ascii=True, desc='To numpy'):
+            if i == self.T:
                 break
             for m, skeleton_info in enumerate(frame_info["skeleton"]):  # TODO: case when id > num_person_in, but len(skeleton) < num_person_in
                 pid = m if ('person_id' not in skeleton_info.keys()) else skeleton_info['person_id']
@@ -166,9 +149,9 @@ class OpenposeInitializer:
                 pid %= self.num_person_in
                 pose = skeleton_info['pose']
                 score = skeleton_info['score'] if 'score' in skeleton_info.keys() else skeleton_info['pose_score']
-                data_numpy[0, frame_index, :, pid] = pose[0::2]
-                data_numpy[1, frame_index, :, pid] = pose[1::2]
-                data_numpy[2, frame_index, :, pid] = score
+                data_numpy[0, i, :, pid] = pose[0::2]
+                data_numpy[1, i, :, pid] = pose[1::2]
+                data_numpy[2, i, :, pid] = score
 
         sort_index = (-data_numpy[2, :, :, :].sum(axis=1)).argsort(axis=1)
         for t, s in enumerate(sort_index):
