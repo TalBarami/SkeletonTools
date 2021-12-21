@@ -1,6 +1,6 @@
-from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.graph_layout import GraphLayout
 
-HAND_LAYOUT = OpenPoseLayout(
+HAND_LAYOUT = GraphLayout(
     'HAND',
     9,
     {0: 'Root',

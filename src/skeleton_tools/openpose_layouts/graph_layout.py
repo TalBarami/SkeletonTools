@@ -1,4 +1,4 @@
-class OpenPoseLayout:
+class GraphLayout:
     def __init__(self, name, center, joints, pairs, face=False, hand=False, model_pose=None):
         self.name = name
         self.center = center

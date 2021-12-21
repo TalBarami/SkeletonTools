@@ -4,7 +4,7 @@ import numpy as np
 import random
 import pandas as pd
 from scipy.interpolate import interp1d
-from scipy.fftpack import fft
+import scipy.fftpack as fp
 
 from tqdm import tqdm
 
@@ -289,8 +289,8 @@ def denormalize_numpy(data_numpy, resolution):
     return x
 
 def to_fft(data_numpy):
-    C = data_numpy.shape[0]
-    return np.abs(fft(data_numpy[:, :C-1, :, :, :], axis=2))
+    ft = fp.fft(data_numpy[0, :, :, :] + 1j * data_numpy[1, :, :, :], axis=2)
+    return np.concatenate((np.expand_dims(ft.real, axis=0), np.expand_dims(ft.imag, axis=0)))
 
 # def add_repetitive_noise_json(json_file, amplitude, cycle, offset):
 #     j_copy = deepcopy(json_file)

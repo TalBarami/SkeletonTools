@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from skeleton_tools.skeleton_visualization.visualizer import Visualizer
+from skeleton_tools.skeleton_visualization.base_visualizer import BaseVisualizer
 from skeleton_tools.utils.skeleton_utils import bounding_box
 from skeleton_tools.utils.tools import read_json, init_directories
 
@@ -36,7 +36,7 @@ class DataSampler:
     def _sample(self, records, n):
         video_files = os.listdir(self.videos_path)
         i = 0
-        v = Visualizer()
+        v = BaseVisualizer()
         df = pd.DataFrame(columns=['image_name', 'center_x', 'center_y', 'height', 'width', 'label', 'org_height', 'org_width'])
         while i < n:
             video_name, segment_name, start_time, end_time, start_frame, end_frame, status, action, child_ids, time, notes = records.sample(n=1).values[0]

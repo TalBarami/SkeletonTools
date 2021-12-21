@@ -6,17 +6,20 @@ from itertools import chain
 from os import path
 from pathlib import Path
 
+import cv2
 import numpy as np
+from evenvizion.processing import video_processing, json
 from tqdm import tqdm
 
-from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.graph_layout import GraphLayout
 from skeleton_tools.utils.tools import read_json, write_json
 
 
 class AcurusTracker:
-    def __init__(self, skeleton_layout: OpenPoseLayout, acurus_path='C:/research/AcurusTrack'):
+    def __init__(self, skeleton_layout: GraphLayout, acurus_path='C:/research/AcurusTrack', acurus_env=r'C:\Users\owner\anaconda3\envs\acurus\python.exe'):
         self.skeleton_layout = skeleton_layout
         self.acurus_path = acurus_path
+        self.acurus_env = acurus_env
         self.special_joints = {
             'MidHip': [self.skeleton_layout.joint('MidHip')],
             'Neck': [self.skeleton_layout.joint('Neck')],
@@ -85,46 +88,86 @@ class AcurusTracker:
                            'skeleton': skeletons})
         return result
 
-    def track(self, skeleton, resolution):
-        process_dir = path.join(self.acurus_path, 'process')
-        Path(process_dir, 'acurus').mkdir(parents=True, exist_ok=True)
-        pre_processed_path = path.join(process_dir, 'acurus', 'pre.json')
-        write_json(self.skeleton_to_acurus(skeleton), pre_processed_path)
-        width, height = resolution
-        exp_name = f'exp_v'
-        save_dir = path.join(process_dir, 'acurus_results')
+    def track(self, skeleton, video_path, fixed_coordinate=False):
+        video_name, _ = path.splitext(path.basename(video_path))
+        experiment_name = 'exp'
+        result_path = path.join(self.acurus_path, 'results')
+        process_dir = path.join(result_path, 'process', video_name)
+        Path(process_dir).mkdir(parents=True, exist_ok=True)
+        acurus_skeleton_path = path.join(process_dir, 'skeleton.json')
+        homography_dict_path = path.join(process_dir, 'homography_dict.json')
+        out_path = path.join(result_path, video_name, experiment_name, 'result', 'result.json')
+
+        write_json(self.skeleton_to_acurus(skeleton), acurus_skeleton_path)
 
         params = {
-            'detections': f'\"{pre_processed_path}\"',
-            'width': width,
-            'height': height,
-            'video_name': f'\"v\"',
-            'exp_name': f'\"{exp_name}\"',
-            'save_dir': f'\"{save_dir}\"',
-            'force': False
+            'detections': f'\"{acurus_skeleton_path}\"',
+            'video_path': f'\"{video_path}\"',
+            'video_name': f'\"{video_name}\"',
+            'exp_name': f'\"{experiment_name}\"'
         }
+        if fixed_coordinate:
+            print(f'Creating homography dict...')
+            cap = cv2.VideoCapture(video_path)
+            homography_dict = video_processing.get_homography_dict(cap)
+            with open(homography_dict_path, "w") as json_:
+                json.dump(homography_dict, json_)
+            params['path_to_homography_dict'] = f'\"{homography_dict_path}\"'
+            cap.release()
+
+        # process_dir = path.join(self.acurus_path, 'process')
+        # Path(process_dir, 'acurus').mkdir(parents=True, exist_ok=True)
+        # pre_processed_path = path.join(process_dir, 'acurus', 'pre.json')
+        # write_json(self.skeleton_to_acurus(skeleton), pre_processed_path)
+        # exp_name = f'exp_v'
+        # save_dir = path.join(process_dir, 'acurus_results')
+        #
+        # params = {
+        #     'detections': f'\"{pre_processed_path}\"',
+        #     'width': width,
+        #     'height': height,
+        #     'video_name': f'\"v\"',
+        #     'exp_name': f'\"{exp_name}\"',
+        #     'save_dir': f'\"{save_dir}\"',
+        #     'force': False
+        # }
+
+        # if video_path is not None:
+        #     path_to_homography_dict = path.join(process_dir, 'homography_dict.json')
+        #     try:
+        #         print(f'Creating homography dict...')
+        #         cap = cv2.VideoCapture(video_path)
+        #         homography_dict = video_processing.get_homography_dict(cap)
+        #         with open(path_to_homography_dict, "w") as json_:
+        #             json.dump(homography_dict, json_)
+        #         params['path_to_homography_dict'] = f'\"{path_to_homography_dict}\"'
+        #     finally:
+        #         if cap is not None and cap.isOpened():
+        #             cap.release()
 
         args = ' '.join([f'--{k} {v}' for k, v in params.items()])
 
-        cmd = f'python {path.join(acurus_path, "run.py")} {args}'.replace('\\', '/')
+        cmd = f'{self.acurus_env} {path.join(self.acurus_path, "run.py")} {args}'.replace('\\', '/')
         print(f'Executing: {cmd}')
         cwd = os.getcwd()
-        os.chdir(acurus_path)
+        os.chdir(self.acurus_path)
         try:
             subprocess.check_call(shlex.split(cmd), universal_newlines=True)
-        except:
-            params['force'] = True
-            args = ' '.join([f'--{k} {v}' for k, v in params.items()])
-            cmd = f'python {path.join(acurus_path, "run.py")} {args}'.replace('\\', '/')
-            print(f'Execution failed, trying with force: {cmd}')
-            try:
-                subprocess.check_call(shlex.split(cmd), universal_newlines=True)
-            except:
-                print(f'Execution with force failed: {cmd}')
-                return skeleton
+        # except:
+        #     params['force'] = True
+        #     args = ' '.join([f'--{k} {v}' for k, v in params.items()])
+        #     cmd = f'python {path.join(self.acurus_path, "run.py")} {args}'.replace('\\', '/')
+        #     print(f'Execution failed, trying with force: {cmd}')
+        #     subprocess.check_call(shlex.split(cmd), universal_newlines=True)
+        #     # try:
+        #     #     subprocess.check_call(shlex.split(cmd), universal_newlines=True)
+        #     # except:
+        #     #     print(f'Execution with force failed: {cmd}')
+        #     #     return skeleton
         finally:
             os.chdir(cwd)
 
-        final_meta = read_json(path.join(save_dir, 'v', exp_name, 'result', 'result.json'))
+        final_meta = read_json(out_path)
         shutil.rmtree(process_dir)
+        shutil.rmtree(path.join(self.acurus_path, 'results', video_name))
         return self.acurus_to_skeleton(final_meta)

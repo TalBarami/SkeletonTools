@@ -1,6 +1,6 @@
-from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.graph_layout import GraphLayout
 
-FACE_LAYOUT = OpenPoseLayout(
+FACE_LAYOUT = GraphLayout(
     'FACE',
     30,
     {

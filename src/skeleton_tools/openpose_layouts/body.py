@@ -1,6 +1,6 @@
-from skeleton_tools.openpose_layouts.openpose_layout import OpenPoseLayout
+from skeleton_tools.openpose_layouts.graph_layout import GraphLayout
 
-BODY_25_LAYOUT = OpenPoseLayout(
+BODY_25_LAYOUT = GraphLayout(
     'BODY_25',
     1,
     {
@@ -38,7 +38,7 @@ BODY_25_LAYOUT = OpenPoseLayout(
         (0, 15), (15, 17), (0, 16), (16, 18)]
 )
 
-BODY_21_LAYOUT = OpenPoseLayout(
+BODY_21_LAYOUT = GraphLayout(
     'BODY_21',
     1,
     {
@@ -75,7 +75,7 @@ BODY_21_LAYOUT = OpenPoseLayout(
         ]
 )
 
-COCO_LAYOUT = OpenPoseLayout(
+COCO_LAYOUT = GraphLayout(
     'COCO',
     1,
     {
@@ -97,10 +97,15 @@ COCO_LAYOUT = OpenPoseLayout(
         15: "LEye",
         16: "REar",
         17: "LEar"
-    }, [(0, 1),
-        (1, 2), (2, 3), (3, 4),
-        (1, 5), (5, 6), (6, 7),
-        (1, 8), (8, 9), (9, 10),
-        (1, 11), (11, 12), (12, 13),
-        (0, 15), (15, 17), (0, 14), (14, 16)]
+    }, [(15, 13), (13, 11), (16, 14),
+        (14, 12), (11, 12), (5, 11), (6, 12),
+        (5, 6), (7, 5), (8, 6), (9, 7),
+        (10, 8), (1, 2), (1, 0), (2, 0),
+        (3, 1), (4, 2), (3, 5), (4, 6)]
+    # [(0, 1),
+    #     (1, 2), (2, 3), (3, 4),
+    #     (1, 5), (5, 6), (6, 7),
+    #     (1, 8), (8, 9), (9, 10),
+    #     (1, 11), (11, 12), (12, 13),
+    #     (0, 15), (15, 17), (0, 14), (14, 16)]
 )

@@ -45,9 +45,9 @@ def write_pkl(p, dst):
 
 def get_video_properties(video_path):
     cap = cv2.VideoCapture(video_path)
-    resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    resolution = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
     return resolution, fps, frame_count
 

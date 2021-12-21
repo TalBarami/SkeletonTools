@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from skeleton_tools.utils import skeleton_utils
+from skeleton_tools.utils.skeleton_utils import to_fft
 from skeleton_tools.utils.tools import read_pkl
 
 
@@ -21,6 +22,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
     def __init__(self,
                  data_path,
                  label_path,
+                 classmap=None,
                  random_repetitions=False,
                  random_position=False,
                  random_mirror=False,
@@ -28,9 +30,11 @@ class SkeletonFeeder(torch.utils.data.Dataset):
                  random_choose=False,
                  random_move=False,
                  interpolate=False,
+                 with_fft=False,
                  window_size=-1,
                  debug=False,
                  mmap=True):
+        self.classmap = classmap
         self.debug = debug
         self.data_path = data_path
         self.label_path = label_path
@@ -41,6 +45,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         self.random_choose = random_choose
         self.random_move = random_move
         self.interpolate = interpolate
+        self.with_fft = with_fft
         self.window_size = window_size
 
         self.load_data(mmap)
@@ -72,6 +77,9 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         data_numpy = np.array(self.data[index])
         label = self.label[index]
 
+        if self.classmap is not None:
+            label = self.classmap[label]
+
         # processing
         if self.random_mirror and np.random.rand() > 0.5:
             data_numpy = skeleton_utils.mirror_sample(data_numpy)
@@ -81,6 +89,8 @@ class SkeletonFeeder(torch.utils.data.Dataset):
             data_numpy = skeleton_utils.random_positioning(data_numpy)
         if self.interpolate:
             data_numpy = skeleton_utils.interpolate(data_numpy)
+        if self.with_fft:
+            data_numpy = np.concatenate((data_numpy, to_fft(data_numpy)), axis=0)
 
         if self.random_choose:
             data_numpy = skeleton_utils.random_choose(data_numpy, self.window_size)

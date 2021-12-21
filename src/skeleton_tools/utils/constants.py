@@ -6,7 +6,7 @@ from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Other', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
-                       'Playing with object', 'Jumping in place', 'NoAction']
+                       'Playing with object', 'Jumping in place', 'Legs Movement', 'NoAction']
 JSON_SOURCES = [
     {'name': 'pose', 'openpose': 'pose_keypoints_2d', 'layout': BODY_25_LAYOUT},
     {'name': 'face', 'openpose': 'face_keypoints_2d', 'layout': FACE_LAYOUT},
