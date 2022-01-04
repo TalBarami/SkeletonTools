@@ -47,7 +47,7 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         self.interpolate = interpolate
         self.with_fft = with_fft
         self.window_size = window_size
-
+        self.eye = np.eye(len(np.unique([x for x in self.classmap.values()])))
         self.load_data(mmap)
 
     def load_data(self, mmap):
@@ -102,5 +102,5 @@ class SkeletonFeeder(torch.utils.data.Dataset):
         if self.random_repetitions:
             data_numpy, label = skeleton_utils.random_repetition(data_numpy, self.random_repetitions)
 
-
+        # label = self.eye[label]
         return data_numpy, label

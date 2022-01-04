@@ -99,7 +99,8 @@ class BaseVisualizer(ABC):
         for i in tqdm(range(length), desc="Writing video result"):
             ret, frame = cap.read()
             skel_frame = np.zeros_like(frame)
-            skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], (width, height), pids[i])
+            if i < len(kp):
+                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], (width, height), pids[i])
             out.write(np.concatenate((frame, skel_frame), axis=1))
         cap.release()
         out.release()

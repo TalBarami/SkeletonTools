@@ -32,7 +32,6 @@ class ChildDetector:
 
     def _read_box(self, box_path):
         with open(box_path, 'r') as f:
-            # children = [x.strip() for x in f.readlines() if x[0] == '1']
             c_boxes = [[float(s) for s in x.strip().split(' ')[1:]] for x in f.readlines() if x[0] == '1']
         return [(np.array((cx, cy)), np.array((w, h))) for cx, cy, w, h in c_boxes]
 
