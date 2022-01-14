@@ -27,3 +27,8 @@ class GraphLayout:
 
     def neighbors(self, i):
         return []
+
+def convert_layout(np_data, l1, l2):
+    assert len(l2) <= len(l1)
+    joints = [l1.joint(i) for i in l2.joints().values()]
+    return np_data[joints]
