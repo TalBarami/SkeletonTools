@@ -32,6 +32,7 @@ class ChildDetector:
 
     def _read_box(self, box_path):
         with open(box_path, 'r') as f:
+            # children = [x.strip() for x in f.readlines() if x[0] == '1']
             c_boxes = [[float(s) for s in x.strip().split(' ')[1:]] for x in f.readlines() if x[0] == '1']
         return [(np.array((cx, cy)), np.array((w, h))) for cx, cy, w, h in c_boxes]
 
@@ -66,7 +67,7 @@ class ChildDetector:
 
     def _detect_children_in_video(self, video_path, resolution=None):
         name, ext = path.splitext(path.basename(video_path))
-        temp_scaled = path.join(self.temp_dir, f'{name}{ext}')
+        temp_scaled = path.join(self.temp_dir, f'{name}_scaled{ext}')
         width, height = self.resolution if resolution is None else resolution
         if path.exists(temp_scaled):
             os.remove(temp_scaled)
@@ -76,8 +77,8 @@ class ChildDetector:
         try:
             vid_res, _, _ = get_video_properties(video_path)
             if vid_res != self.resolution:
-                raise ValueError("Resolution mismatch")
-            # self._rescale_video(video_path, temp_scaled)
+                self._rescale_video(video_path, temp_scaled)
+                video_path = temp_scaled
             args = {
                 'weights': f'"{self.model_path}"',
                 'img': width,
@@ -108,8 +109,13 @@ class ChildDetector:
             return skeletons[np.argmin(distances)]['person_id']
 
     def _match_video(self, box_json, video_json):
-        if (not (any(box_json) or any(video_json))) or box_json[-1]['frame_index'] != video_json[-1]['frame_index']:
-            raise ValueError(f'Box: {len(box_json)}, Skeleton: {len(video_json)}')
+        if not (any(box_json) or any(video_json)):
+            raise ValueError('Empty box / skeleton')
+        if box_json[-1]['frame_index'] != video_json[-1]['frame_index']:
+            print(f'Error - frames mismatch: Box: {len(box_json)}, Skeleton: {len(video_json)}')
+            length = np.min((len(box_json), len(video_json)))
+            box_json = box_json[:length]
+            video_json = video_json[:length]
         pids = [self._match_skeleton(box, frame_info['skeleton']) if frame_info['skeleton'] else -1
                 for box, frame_info in zip(box_json, video_json)]
         return pids

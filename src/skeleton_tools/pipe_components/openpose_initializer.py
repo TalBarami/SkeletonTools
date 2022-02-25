@@ -65,6 +65,32 @@ class OpenposeInitializer:
             os.chdir(cwd)
             print('OpenPose finished.')
 
+    def prepare_skeleton(self, src_path, result_skeleton_dir=None, source_type=SkeletonSource.VIDEO, out_name=None):
+        basename = path.basename(src_path)
+        basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
+        openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
+
+        try:
+            resolution, fps, frame_count = get_video_properties(src_path)
+            self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
+            data = self.openpose_to_json(openpose_output_path)
+            skeleton = {
+                'name': basename,
+                'resolution': resolution,
+                'fps': fps,
+                'length': frame_count,
+                'data': data
+            }
+            if result_skeleton_dir:
+                result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
+                write_pkl(skeleton, result_path)
+            return skeleton
+        except Exception as e:
+            print(f'Error creating skeleton from {src_path}: {e}')
+            raise e
+        finally:
+            shutil.rmtree(openpose_output_path)
+
     def openpose_to_json(self, openpose_dir):
         file_names = [path.join(openpose_dir, f) for f in os.listdir(openpose_dir) if path.isfile(path.join(openpose_dir, f)) and f.endswith('json')]
 
@@ -91,32 +117,57 @@ class OpenposeInitializer:
                            'skeleton': skeletons})
         return result
 
-    def prepare_skeleton(self, src_path, result_skeleton_dir=None, source_type=SkeletonSource.VIDEO, out_name=None):
-        basename = path.basename(src_path)
-        basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
-        openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
-
-        try:
-            resolution, fps, frame_count = get_video_properties(src_path)
-            self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
-            # kp, scores, pids = self.openpose_to_numpy(openpose_output_path)
-            data = self.openpose_to_json(openpose_output_path)
-            skeleton = {
-                'name': basename,
-                'resolution': resolution,
-                'fps': fps,
-                'length': frame_count,
-                'data': data
-            }
-            if result_skeleton_dir:
-                result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
-                write_pkl(skeleton, result_path)
-            return skeleton
-        except Exception as e:
-            print(f'Error creating skeleton from {src_path}: {e}')
-            raise e
-        finally:
-            shutil.rmtree(openpose_output_path)
+    # def collect_openpose_data(self, openpose_output_path, in_channels=2, max_people=3):
+    #     def collect_data(lst):
+    #         k = np.array([float(c) for c in lst])
+    #         x = np.round(k[::3], 8)
+    #         y = np.round(k[1::3], 8)
+    #         c = np.round(k[2::3], 8)
+    #         return np.concatenate((x, y), axis=1), c
+    #
+    #     file_names = [path.join(openpose_output_path, f) for f in os.listdir(openpose_output_path) if path.isfile(path.join(openpose_output_path, f)) and f.endswith('json')]
+    #
+    #     kps = np.zeros((max_people, len(file_names), len(self.layout), in_channels))
+    #     scores = np.zeros((max_people, len(file_names), len(self.layout)))
+    #
+    #     for i, file in tqdm(enumerate(file_names), ascii=True, desc='Collect OpenPose'):
+    #         skeletons = read_json(file)['people']
+    #         for j, skeleton in enumerate(skeletons):
+    #             kp, s = collect_data(skeleton['pose_keypoints_2d'])
+    #             kps[j, i, :, :] = kp
+    #             scores[j, i, :] = s
+    #     return kps, scores
+    #
+    # def prepare_skeleton_new(self, src_path, result_skeleton_dir=None, source_type=SkeletonSource.VIDEO, out_name=None, label=None, label_index=None):
+    #     basename = path.basename(src_path)
+    #     basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
+    #     openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
+    #
+    #     try:
+    #         resolution, fps, frame_count = get_video_properties(src_path)
+    #         self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
+    #         kp, s = self.collect_openpose_data(openpose_output_path)
+    #         skeleton = {
+    #             'keypoint': kp,
+    #             'keypoint_score': s,
+    #             'frame_dir': basename,
+    #             'img_shape': resolution,
+    #             'original_shape': resolution,
+    #             'fps': fps,
+    #             'total_frames': frame_count,
+    #         }
+    #         if label is not None and label_index is not None:
+    #             skeleton['label_name'] = label
+    #             skeleton['label'] = label_index
+    #         if result_skeleton_dir:
+    #             result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
+    #             write_pkl(skeleton, result_path)
+    #         return skeleton
+    #     except Exception as e:
+    #         print(f'Error creating skeleton from {src_path}: {e}')
+    #         raise e
+    #     finally:
+    #         shutil.rmtree(openpose_output_path)
 
     def normalize(self, skeleton, centralize):
         new_skeleton = skeleton.copy()
@@ -154,19 +205,20 @@ class OpenposeInitializer:
             data_numpy[:, t, :, :] = data_numpy[:, t, :, s].transpose((1, 2, 0))
         return data_numpy[:, :, :, 0:self.num_person_out]
 
-    def _to_posec3d_numpy(self, skeleton_data, in_channels=2, max_people=1, src_layout=BODY_25_LAYOUT, dst_layout=COCO_LAYOUT):
-        kps = np.zeros((max_people, len(skeleton_data), len(dst_layout), in_channels))
-        scores = np.zeros((max_people, len(skeleton_data), len(dst_layout)))
+    def _to_posec3d_numpy(self, skeleton_data, in_layout, out_layout, in_channels, max_people):
+        keypoints = np.zeros((max_people, len(skeleton_data), len(out_layout), in_channels))
+        scores = np.zeros((max_people, len(skeleton_data), len(out_layout)))
 
         for i, frame_info in enumerate(skeleton_data):
-            for j, skeleton in enumerate(frame_info['skeleton']):
-                kp, s = np.array([skeleton['pose'][::2], skeleton['pose'][1::2]]).T, np.array(skeleton['pose_score'])
-                kps[j, i, :, :] = convert_layout(kp, src_layout, dst_layout)
-                scores[j, i, :] = convert_layout(s, src_layout, dst_layout)
-        return kps, scores
+            skeletons = sorted(frame_info['skeleton'], key=lambda s: np.mean(s['pose_score']), reverse=True)[:max_people]
+            for j, skeleton in enumerate(skeletons):
+                keypoint, score = np.array([skeleton['pose'][::2], skeleton['pose'][1::2]]).T, np.array(skeleton['pose_score'])
+                keypoints[j, i, :, :] = convert_layout(keypoint, in_layout, out_layout)
+                scores[j, i, :] = convert_layout(score, in_layout, out_layout)
+        return keypoints, scores
 
-    def to_poseC3D(self, json_file, label=None, label_index=None):
-        kp, s = self._to_posec3d_numpy(json_file['data'])
+    def to_poseC3D(self, json_file, label=None, label_index=None, in_layout=BODY_25_LAYOUT, out_layout=COCO_LAYOUT, in_channels=2, max_people=3):
+        kp, s = self._to_posec3d_numpy(json_file['data'], in_layout, out_layout, in_channels=in_channels, max_people=max_people)
         result = {
             'keypoint': kp,
             'keypoint_score': s,
