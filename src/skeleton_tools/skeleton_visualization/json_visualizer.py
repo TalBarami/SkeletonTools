@@ -7,6 +7,9 @@ from skeleton_tools.utils.tools import get_video_properties
 
 
 class JsonVisualizer(BaseVisualizer):
+    def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
+        super().__init__(graph_layout, display_pid, display_bbox, denormalize, decentralize, blur_face, show_confidence)
+
     def get_video_info(self, video_path, skeleton_data):
         (width, height), fps, length = get_video_properties(video_path)
 

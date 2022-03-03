@@ -89,14 +89,16 @@ class BaseVisualizer(ABC):
         final_img = img_mask + mask2
         return final_img
 
-    def create_double_frame_video(self, video_path, skeleton_data, out_path):
-        fps, length, (width, height), kp, c, pids = self.get_video_info(video_path, skeleton_data)
+    def create_double_frame_video(self, video_path, skeleton_data, out_path, start=None, end=None):
+        fps, frames_count, (width, height), kp, c, pids = self.get_video_info(video_path, skeleton_data)
+        start = int(0 if start is None else start * fps)
+        end = int(frames_count if end is None else end * fps)
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(out_path, fourcc, fps, (2 * width, height))
         cap = cv2.VideoCapture(video_path)
-
-        for i in tqdm(range(length), desc="Writing video result"):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        for i in tqdm(range(start, end), desc="Writing video result"):
             ret, frame = cap.read()
             skel_frame = np.zeros_like(frame)
             if i < len(kp):
