@@ -154,19 +154,19 @@ class OpenposeInitializer:
             data_numpy[:, t, :, :] = data_numpy[:, t, :, s].transpose((1, 2, 0))
         return data_numpy[:, :, :, 0:self.num_person_out]
 
-    def _to_posec3d_numpy(self, skeleton_data, in_channels=2, max_people=1, src_layout=BODY_25_LAYOUT, dst_layout=COCO_LAYOUT):
+    def _to_posec3d_numpy(self, skeleton_data, in_channels, max_people, src_layout, dst_layout):
         kps = np.zeros((max_people, len(skeleton_data), len(dst_layout), in_channels))
         scores = np.zeros((max_people, len(skeleton_data), len(dst_layout)))
 
         for i, frame_info in enumerate(skeleton_data):
-            for j, skeleton in enumerate(frame_info['skeleton']):
+            for j, skeleton in enumerate(frame_info['skeleton'][:max_people]):
                 kp, s = np.array([skeleton['pose'][::2], skeleton['pose'][1::2]]).T, np.array(skeleton['pose_score'])
                 kps[j, i, :, :] = convert_layout(kp, src_layout, dst_layout)
                 scores[j, i, :] = convert_layout(s, src_layout, dst_layout)
         return kps, scores
 
-    def to_poseC3D(self, json_file, label=None, label_index=None):
-        kp, s = self._to_posec3d_numpy(json_file['data'])
+    def to_poseC3D(self, json_file, label=None, label_index=None, in_channels=2, max_people=1, src_layout=BODY_25_LAYOUT, dst_layout=COCO_LAYOUT):
+        kp, s = self._to_posec3d_numpy(json_file['data'], in_channels, max_people, src_layout, dst_layout)
         result = {
             'keypoint': kp,
             'keypoint_score': s,

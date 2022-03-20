@@ -9,6 +9,12 @@ import pandas as pd
 import numpy as np
 import cv2
 
+def get_videos(root=r'E:\database\AutismCenter'):
+    video_files = {}
+    for dir_path, dirs, files in os.walk(root):
+        for file in files:
+            video_files[path.splitext(file)[0]] = path.join(dir_path, file)
+    return video_files
 
 def init_directories(*dirs):
     for dir in dirs:
