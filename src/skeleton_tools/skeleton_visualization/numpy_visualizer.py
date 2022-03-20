@@ -6,6 +6,9 @@ from skeleton_tools.skeleton_visualization.base_visualizer import BaseVisualizer
 
 
 class MMPoseVisualizer(BaseVisualizer):
+    def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
+        super().__init__(graph_layout, display_pid, display_bbox, denormalize, decentralize, blur_face, show_confidence)
+
     def get_video_info(self, video_path, skeleton_data):
         fps = skeleton_data['fps']
         length = skeleton_data['total_frames']

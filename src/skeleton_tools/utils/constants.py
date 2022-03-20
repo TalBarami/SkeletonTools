@@ -4,6 +4,9 @@ from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.openpose_layouts.face import FACE_LAYOUT
 from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
+NET_NAME = 'JORDI'
+NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
+
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
                        'Playing with object', 'Jumping in place', 'Legs movement', 'Feeling texture', 'Other', 'NoAction']
