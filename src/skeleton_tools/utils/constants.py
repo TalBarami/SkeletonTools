@@ -6,7 +6,7 @@ from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
 NET_NAME = 'JORDI'
 NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
-REMOTE_STORAGE = r'\\ac-s1\Data'
+REMOTE_STORAGE = r'\\ac-s1\Data\Autism Center'
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
