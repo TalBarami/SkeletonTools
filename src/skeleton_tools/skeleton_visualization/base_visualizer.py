@@ -33,11 +33,11 @@ class BaseVisualizer(ABC):
         skeletons = skeletons.astype(int)
 
         if self.blur_face:
-            for i, pose in enumerate(skeletons):
-                face_joints = [0, 15, 16, 17, 18]
-                pc = scores[i, face_joints]
+            for i, (pose, score) in enumerate(zip(skeletons, scores)):
+                face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in ['Eye', 'Ear', 'Nose']])]
+                pc = score[face_joints]
                 if (pc > 0).any():
-                    ps = pose[:, face_joints][:, pc > 0].T
+                    ps = pose[face_joints][pc > 0]
                     for p in ps:
                         img = self.blur_area(img, tuple(p), 100)
 
@@ -116,8 +116,11 @@ class BaseVisualizer(ABC):
 
         for i in tqdm(range(length), desc="Writing video result"):
             ret, frame = cap.read()
-            frame = self.draw_skeletons(frame, kp[i], c[i], (width, height), pids[i])
-            out.write(frame)
+            if ret:
+                frame = self.draw_skeletons(frame, kp[i], c[i], (width, height), pids[i])
+                out.write(frame)
+            else:
+                break
         cap.release()
         out.release()
 
