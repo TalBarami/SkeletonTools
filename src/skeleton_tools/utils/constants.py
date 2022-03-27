@@ -5,12 +5,12 @@ from skeleton_tools.openpose_layouts.face import FACE_LAYOUT
 from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
 NET_NAME = 'JORDI'
-NET_FULLNAME = '_____ RRB Diagnostic Instrument'
+NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
 REMOTE_STORAGE = r'\\ac-s1\Data'
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
-                       'Playing with object', 'Jumping in place', 'Legs movement', 'Feeling Texture', 'Other', 'NoAction']
+                       'Playing with object', 'Jumping in place', 'Legs movement', 'Feeling texture', 'Other', 'NoAction']
 JSON_SOURCES = [
     {'name': 'pose', 'openpose': 'pose_keypoints_2d', 'layout': BODY_25_LAYOUT},
     {'name': 'face', 'openpose': 'face_keypoints_2d', 'layout': FACE_LAYOUT},

@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.utils.constants import COLORS, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
 from skeleton_tools.utils.tools import read_json
@@ -43,6 +44,8 @@ class BaseVisualizer(ABC):
 
         for pose, score, pid in zip(skeletons, scores, pids):
             color = tuple(reversed(COLORS[(pid % len(COLORS))]['value']))
+            if img.shape[-1] > 3:
+                color += (255,)
 
             img = self.draw_skeleton(img, pose, score, color)
 
@@ -53,22 +56,28 @@ class BaseVisualizer(ABC):
                 self.draw_bbox(img, bounding_box(pose.T, score))
         return img
 
-    def draw_skeleton(self, frame, pose, score, color=None, epsilon=0.05):
+    def draw_skeleton(self, frame, pose, score, edge_color=None, epsilon=0.05):
         img = np.copy(frame)
-        if color is None:
-            color = (0, 0, 255)
+        if edge_color is None:
+            edge_color = (0, 0, 255)
+        joint_color = (0, 60, 255)
+        if img.shape[-1] > 3:
+            joint_color += (255,)
         for (v1, v2) in self.graph_layout.pairs():
             if score[v1] > epsilon and score[v2] > epsilon:
-                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), color, thickness=2, lineType=cv2.LINE_AA)
-        for i, (x, y) in enumerate(pose):
-            if score[i] > epsilon:
-                jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else ((0, 60, 255), 2)
-                cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
+                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=2, lineType=cv2.LINE_AA)
+        # for i, (x, y) in enumerate(pose):
+        #     if score[i] > epsilon:
+        #         jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else (joint_color, 2)
+        #         cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
         return img
 
     def draw_bbox(self, frame, bbox):
         center, r = bbox
-        cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=(255, 255, 255), thickness=1)
+        bcolor = (255, 255, 255)
+        if frame.shape[-3] > 3:
+            bcolor += (255,)
+        cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=bcolor, thickness=1)
 
     def draw_pid(self, frame, pose, c, pid, color):
         if np.all(c < EPSILON):
@@ -88,6 +97,17 @@ class BaseVisualizer(ABC):
         mask2 = cv2.bitwise_and(blur, blur, mask=c_mask)  # mask
         final_img = img_mask + mask2
         return final_img
+
+    def create_skeleton_video(self, skeleton_json, out_path):
+        fps, length, (width, height), kp, c, pids = self.get_video_info(None, skeleton_json)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+
+        for i in tqdm(range(length), desc="Writing video result"):
+            if i < len(kp):
+                skel_frame = self.draw_skeletons(np.zeros((height, width, 3), dtype=np.uint8), kp[i], c[i], (width, height), pids[i])
+                out.write(skel_frame)
+        out.release()
 
     def create_double_frame_video(self, video_path, skeleton_data, out_path, start=None, end=None):
         fps, frames_count, (width, height), kp, c, pids = self.get_video_info(video_path, skeleton_data)
@@ -176,57 +196,6 @@ class BaseVisualizer(ABC):
 
 
 if __name__ == '__main__':
-    # org_root = r'D:\datasets\autism_center\skeletons\data'
-    # skel_root = r'D:\datasets\autism_center\skeletons_filtered\data'
-    # vids_root = r'D:\datasets\autism_center\segmented_videos'
-    # out_dir = r'D:\datasets\autism_center\qa_vids'
-    # bbox_root = r'C:\research\yolov5\runs\detect\100971247_Linguistic_210218_1109_3_Hand flapping_24965_25177\labels'
-    # v = Visualizer()
-
-    # file = '100971247_Linguistic_210218_1109_3_Hand flapping_24965_25177.json'
-    # name, ext = path.splitext(file)
-    # v_name = f'{name}.avi' if path.exists(path.join(vids_root, f'{name}.avi')) else f'{name}.mp4'
-    # cap = cv2.VideoCapture(path.join(vids_root, v_name))
-    # skel = read_json(path.join(org_root, file))['data']
-    # for frame_info in skel:
-    #     frame_info['skeleton'] = [{'person_id': s['person_id'], 'pose': s['pose'], 'pose_score': s['score']} for s in frame_info['skeleton']]
-    # box_files = os.listdir(bbox_root)
-    # i = 0
-    # width, height = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
-    # d = ChildDetector()
-    # box_json = d._collect_json(r'C:\research\yolov5\runs\detect\100971247_Linguistic_210218_1109_3_Hand flapping_24965_25177\labels')
-    # cids = d._match_video(box_json, skel)
-    #
-    # while cap.isOpened() and i < len(skel):
-    #     ret, frame = cap.read()
-    #     if ret:
-    #         cx, cy, w, h = box_json[i]['box']
-    #         cx, cy, w, h = int(float(cx) * width), int(float(cy) * height), int(float(w) * 2 * width), int(float(h) * 2 * height)
-    #         v.draw_bbox(frame, (np.array((cx, cy)), np.array((w, h))))
-    #         # with open(path.join(bbox_root, box_files[i])) as f:
-    #         #     boxs = [x.strip() for x in f.readlines()]
-    #         # for line in boxs:
-    #         #     l, cx, cy, w, h = line.split(' ')
-    #         #     cx, cy, w, h = int(float(cx) * width), int(float(cy) * height), int(float(w) * 2 * width), int(float(h) * 2 * height)
-    #         #     v.draw_bbox(frame, (np.array((cx, cy)), np.array((w, h))))
-    #         #     cv2.putText(frame, l, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 2, cv2.LINE_AA)
-    #         frame = v.draw_json_skeletons(frame, skel[i]['skeleton'], (width, height), is_normalized=True)
-    #         if cids[i] >= 0:
-    #             try:
-    #                 selected = [s for s in skel[i]['skeleton'] if s['person_id'] == cids[i]][0]
-    #                 xx = np.array(selected['pose'][0::2]) * width
-    #                 yy = np.array(selected['pose'][1::2]) * height
-    #                 cc = np.array(selected['pose_score'])
-    #                 cv2.putText(frame, "SELECTED", (int(xx[1]), int(yy[1])), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2, cv2.LINE_AA)
-    #             except IndexError:
-    #                 print(1)
-    #         cv2.imshow('', frame)
-    #     i += 1
-    #     if cv2.waitKey(10) & 0xFF == ord('q'):
-    #         break
-    # cap.release()
-
     skel_root = r'D:\datasets\autism_center_take2\skeletons'
     vids_root = r'D:\datasets\autism_center_take2\segmented_videos'
     out_dir = r'D:\datasets\autism_center_take2\new_videos'
