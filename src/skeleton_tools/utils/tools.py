@@ -1,13 +1,16 @@
 import json
 import os
 import pickle
+import subprocess
 from json import JSONDecodeError
 from os import path
 from pathlib import Path
 
+import ffmpeg
 import pandas as pd
 import numpy as np
 import cv2
+
 
 def get_videos(root=r'E:\database\AutismCenter'):
     video_files = {}
@@ -15,6 +18,7 @@ def get_videos(root=r'E:\database\AutismCenter'):
         for file in files:
             video_files[path.splitext(file)[0]] = path.join(dir_path, file)
     return video_files
+
 
 def init_directories(*dirs):
     for dir in dirs:
@@ -49,14 +53,30 @@ def write_pkl(p, dst):
         pickle.dump(p, f)
 
 
-def get_video_properties(video_path):
-    cap = cv2.VideoCapture(video_path)
-    resolution = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.release()
-    return resolution, fps, frame_count
+# def get_video_properties(video_path):
+#     cap = cv2.VideoCapture(video_path)
+#     resolution = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#     fps = cap.get(cv2.CAP_PROP_FPS)
+#     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#     cap.release()
+#     return resolution, fps, frame_count
 
+def get_video_properties(filename):
+    try:
+        vinf = ffmpeg.probe(filename)
+
+        resolution_candidates = [(vinf['streams'][i]['width'], vinf['streams'][i]['height']) for i in range(len(vinf['streams'])) if 'width' in vinf['streams'][i].keys() and 'height' in vinf['streams'][i].keys()]
+        fps_candidates = [vinf['streams'][i]['avg_frame_rate'] for i in range(len(vinf['streams'])) if 'avg_frame_rate' in vinf['streams'][i].keys()] + \
+                         [vinf['streams'][i]['r_frame_rate'] for i in range(len(vinf['streams'])) if 'r_frame_rate' in vinf['streams'][i].keys()]
+        fps_candidates = [x for x in fps_candidates if x != '0/0']
+
+        resolution = resolution_candidates[0] if len(resolution_candidates) > 0 else None
+        fps = eval(fps_candidates[0]) if len(fps_candidates) > 0 else None
+        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else None
+        frame_count = length * fps if length and fps else None
+        return resolution, fps, frame_count, length
+    except Exception as e:
+        return None, None, None, None
 
 def generate_label_json(skeletons_dir):
     data_dir = path.join(skeletons_dir, 'data')
