@@ -1,26 +1,38 @@
 import numpy as np
+from torch.utils.data import Dataset
 from tqdm import tqdm
 from os import path
 
-from skeleton_tools.utils.tools import read_json, write_json
+from skeleton_tools.utils.constants import LENGTH, STEP_SIZE
 
 
-class Splitter:
-    def __init__(self, step_size, window_size):
+class Splitter(Dataset):
+    def __init__(self, skeleton, sequence_length=LENGTH, step_size=STEP_SIZE):
+        self.skeleton = skeleton
+        self.sequence_length = sequence_length
         self.step_size = step_size
-        self.window_size = window_size
+        self.N, self.T, self.J, self.C = self.skeleton['keypoint'].shape
 
-    def split(self, skeleton):
-        skeleton_data = skeleton['data']
-        T = len(skeleton_data)
-        segments = range(0, T - self.window_size + self.step_size, self.step_size)
-        result = []
-        for s in tqdm(segments, ascii=True, desc='Splitting'):
-            t = np.min((s + self.window_size, T))
-            window = skeleton_data[s:t]
-            for i, w in enumerate(window):
-                w['frame_index'] = i
-            result.append(window)
-            s += self.step_size
-        return result
+        self.intervals = [(x, min(x+self.sequence_length, self.T)) for x in range(0, self.T - self.sequence_length + self.step_size, self.step_size)]
+        self.template = {k: v for k, v in self.skeleton.items() if k not in ['keypoint', 'keypoint_score', 'total_frames', 'frame_dir']}
+        self.template['basename'] = self.skeleton['frame_dir']
 
+    def __getitem__(self, index):
+        s, t = self.intervals[index]
+        kp = self.skeleton['keypoint'][:, s:t, :, :]
+        kps = self.skeleton['keypoint_score'][:, s:t, :]
+        basename, _ = path.splitext(self.template["basename"])
+        return {**dict(self.template), **{'keypoint': kp,
+                                          'keypoint_score': kps,
+                                          'frame_dir': f'{basename}_{index}',
+                                          'total_frames': t-s,
+                                          'segment_name': f'{basename}_{s}_{t}',
+                                          'start': s,
+                                          'end': t,
+                                          'label': -1}}
+
+    def __len__(self):
+        return len(self.intervals)
+
+    def collect(self):
+        return [x for x in self]
