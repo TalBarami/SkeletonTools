@@ -1,20 +1,25 @@
 import json
 import os
 import pickle
+import subprocess
 from json import JSONDecodeError
-from os import path
+from os import path as osp
 from pathlib import Path
 
+import ffmpeg
 import pandas as pd
 import numpy as np
 import cv2
+
 
 def get_videos(root=r'E:\database\AutismCenter'):
     video_files = {}
     for dir_path, dirs, files in os.walk(root):
         for file in files:
-            video_files[path.splitext(file)[0]] = path.join(dir_path, file)
+            if osp.splitext(file)[1].lower() in ['mp4', 'avi']:
+                video_files[osp.basename(file)] = osp.join(dir_path, file)
     return video_files
+
 
 def init_directories(*dirs):
     for dir in dirs:
@@ -49,24 +54,42 @@ def write_pkl(p, dst):
         pickle.dump(p, f)
 
 
-def get_video_properties(video_path):
-    cap = cv2.VideoCapture(video_path)
-    resolution = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.release()
-    return resolution, fps, frame_count
+def take_subclip(video_path, start_time, end_time, fps, out_path):
+    duration = end_time - start_time
+    ffmpeg.input(video_path) \
+        .trim(start=start_time, duration=duration) \
+        .filter('fps', fps=fps, round='up') \
+        .output(out_path) \
+        .run()
+
+
+def get_video_properties(filename):
+    try:
+        vinf = ffmpeg.probe(filename)
+
+        resolution_candidates = [(vinf['streams'][i]['width'], vinf['streams'][i]['height']) for i in range(len(vinf['streams'])) if 'width' in vinf['streams'][i].keys() and 'height' in vinf['streams'][i].keys()]
+        fps_candidates = [vinf['streams'][i]['avg_frame_rate'] for i in range(len(vinf['streams'])) if 'avg_frame_rate' in vinf['streams'][i].keys()] + \
+                         [vinf['streams'][i]['r_frame_rate'] for i in range(len(vinf['streams'])) if 'r_frame_rate' in vinf['streams'][i].keys()]
+        fps_candidates = [x for x in fps_candidates if x != '0/0']
+
+        resolution = resolution_candidates[0] if len(resolution_candidates) > 0 else None
+        fps = eval(fps_candidates[0]) if len(fps_candidates) > 0 else None
+        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else None
+        frame_count = length * fps if length and fps else None
+        return resolution, fps, frame_count, length
+    except Exception as e:
+        return None, None, None, None
 
 
 def generate_label_json(skeletons_dir):
-    data_dir = path.join(skeletons_dir, 'data')
+    data_dir = osp.join(skeletons_dir, 'data')
     files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
     result = {}
     for file in files:
         name = file.split('.')[0]
-        json_file = read_json(path.join(data_dir, file))
+        json_file = read_json(osp.join(data_dir, file))
         result[name] = {'has_skeleton': True, 'label': json_file['label'], 'label_index': json_file['label_index']}
-    write_json(result, path.join(skeletons_dir, 'label.json'))
+    write_json(result, osp.join(skeletons_dir, 'label.json'))
 
 
 def top_k_by_category(label, score, top_k):
@@ -117,7 +140,7 @@ def json_to_pandas(file_path):
 
 
 def combine_meta_data(face_dir, hand_dir, combined_dir):
-    files = [(f, path.join(face_dir, f), path.join(hand_dir, f)) for f in os.listdir(face_dir)]
+    files = [(f, osp.join(face_dir, f), osp.join(hand_dir, f)) for f in os.listdir(face_dir)]
     for name, face, hand in files:
         face = read_json(face)
         hand = read_json(hand)
@@ -127,4 +150,4 @@ def combine_meta_data(face_dir, hand_dir, combined_dir):
             #     print(f'Error: {i}')
             face['people'][i]['hand_left_keypoints_2d'] = hand['people'][i]['hand_left_keypoints_2d']
             face['people'][i]['hand_right_keypoints_2d'] = hand['people'][i]['hand_right_keypoints_2d']
-        write_json(face, path.join(combined_dir, name))
+        write_json(face, osp.join(combined_dir, name))
