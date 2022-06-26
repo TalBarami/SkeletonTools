@@ -23,7 +23,7 @@ class BaseVisualizer(ABC):
         self.blur_face = blur_face
         self.show_confidence = show_confidence
 
-    def draw_skeletons(self, frame, skeletons, scores, resolution, pids=None):
+    def draw_skeletons(self, frame, skeletons, scores, resolution=None, pids=None):
         img = np.copy(frame)
 
         if pids is None:
