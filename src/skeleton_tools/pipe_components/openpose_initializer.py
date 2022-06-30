@@ -71,14 +71,15 @@ class OpenposeInitializer:
         openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
 
         try:
-            resolution, fps, frame_count = get_video_properties(src_path)
+            resolution, fps, frame_count, length = get_video_properties(src_path)
             self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
             skeleton = {
                 'name': basename,
                 'resolution': resolution,
                 'fps': fps,
-                'length': frame_count,
+                'frame_count': frame_count,
+                'length_seconds': length,
                 'data': data
             }
             if result_skeleton_dir:

@@ -12,12 +12,14 @@ import numpy as np
 import cv2
 
 
-def get_videos(root=r'E:\database\AutismCenter'):
+def get_videos(root=r'Z:\recordings'):
     video_files = {}
     for dir_path, dirs, files in os.walk(root):
         for file in files:
-            if osp.splitext(file)[1].lower() in ['mp4', 'avi']:
+            if osp.splitext(file)[1].lower() in ['.mp4', '.avi']:
                 video_files[osp.basename(file)] = osp.join(dir_path, file)
+            else:
+                print(1)
     return video_files
 
 
@@ -55,9 +57,9 @@ def write_pkl(p, dst):
 
 
 def take_subclip(video_path, start_time, end_time, fps, out_path):
-    duration = end_time - start_time
-    ffmpeg.input(video_path) \
-        .trim(start=start_time, duration=duration) \
+    ffmpeg.input(video_path).video \
+        .trim(start=start_time, end=end_time) \
+        .setpts('PTS-STARTPTS') \
         .filter('fps', fps=fps, round='up') \
         .output(out_path) \
         .run()
