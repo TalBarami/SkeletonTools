@@ -78,7 +78,8 @@ class OpenposeInitializer:
                 'name': basename,
                 'resolution': resolution,
                 'fps': fps,
-                'length': frame_count,
+                'frame_count': frame_count,
+                'length_seconds': length,
                 'data': data
             }
             if result_skeleton_dir:
