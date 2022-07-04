@@ -71,7 +71,7 @@ class OpenposeInitializer:
         openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
 
         try:
-            resolution, fps, frame_count = get_video_properties(src_path)
+            resolution, fps, frame_count, length = get_video_properties(src_path)
             self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
             skeleton = {
@@ -205,20 +205,20 @@ class OpenposeInitializer:
             data_numpy[:, t, :, :] = data_numpy[:, t, :, s].transpose((1, 2, 0))
         return data_numpy[:, :, :, 0:self.num_person_out]
 
-    def _to_posec3d_numpy(self, skeleton_data, in_layout, out_layout, in_channels, max_people):
-        keypoints = np.zeros((max_people, len(skeleton_data), len(out_layout), in_channels))
-        scores = np.zeros((max_people, len(skeleton_data), len(out_layout)))
+    def _to_posec3d_numpy(self, skeleton_data, in_layout, out_layout):
+        keypoints = np.zeros((self.num_person_out, len(skeleton_data), len(out_layout), self.C - 1))
+        scores = np.zeros((self.num_person_out, len(skeleton_data), len(out_layout)))
 
         for i, frame_info in enumerate(skeleton_data):
-            skeletons = sorted(frame_info['skeleton'], key=lambda s: np.mean(s['pose_score']), reverse=True)[:max_people]
+            skeletons = sorted(frame_info['skeleton'], key=lambda s: np.mean(s['pose_score']), reverse=True)[:self.num_person_out]
             for j, skeleton in enumerate(skeletons):
                 keypoint, score = np.array([skeleton['pose'][::2], skeleton['pose'][1::2]]).T, np.array(skeleton['pose_score'])
                 keypoints[j, i, :, :] = convert_layout(keypoint, in_layout, out_layout)
                 scores[j, i, :] = convert_layout(score, in_layout, out_layout)
         return keypoints, scores
 
-    def to_poseC3D(self, json_file, label=None, label_index=None, in_layout=BODY_25_LAYOUT, out_layout=COCO_LAYOUT, in_channels=2, max_people=3):
-        kp, s = self._to_posec3d_numpy(json_file['data'], in_layout, out_layout, in_channels=in_channels, max_people=max_people)
+    def to_poseC3D(self, json_file, label=None, label_index=None, in_layout=BODY_25_LAYOUT, out_layout=COCO_LAYOUT):
+        kp, s = self._to_posec3d_numpy(json_file['data'], in_layout, out_layout)
         result = {
             'keypoint': kp,
             'keypoint_score': s,
