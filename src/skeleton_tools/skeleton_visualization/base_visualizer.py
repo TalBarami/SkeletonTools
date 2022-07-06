@@ -23,7 +23,7 @@ class BaseVisualizer(ABC):
         self.blur_face = blur_face
         self.show_confidence = show_confidence
 
-    def draw_skeletons(self, frame, skeletons, scores, resolution=None, pids=None):
+    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, resolution=None, pids=None):
         img = np.copy(frame)
 
         if pids is None:
@@ -47,13 +47,13 @@ class BaseVisualizer(ABC):
             if img.shape[-1] > 3:
                 color += (255,)
 
-            img = self.draw_skeleton(img, pose, score, color)
+            img = self.draw_skeleton(img, pose, score, edge_color=color, epsilon=epsilon)
 
             if self.display_pid:
                 self.draw_pid(img, pose.T, score, pid, color)
 
             if self.display_bbox:
-                self.draw_bbox(img, bounding_box(pose.T, score))
+                self.draw_bbox(img, bounding_box(pose.T, score, epsilon))
         return img
 
     def draw_skeleton(self, frame, pose, score, edge_color=None, epsilon=0.05):
@@ -72,9 +72,9 @@ class BaseVisualizer(ABC):
         #         cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
         return img
 
-    def draw_bbox(self, frame, bbox):
+    def draw_bbox(self, frame, bbox, bcolor=(255 ,255, 255)):
         center, r = bbox
-        bcolor = (255, 255, 255)
+        r = r // 2
         if frame.shape[-3] > 3:
             bcolor += (255,)
         cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=bcolor, thickness=1)
@@ -105,7 +105,7 @@ class BaseVisualizer(ABC):
 
         for i in tqdm(range(length), desc="Writing video result"):
             if i < len(kp):
-                skel_frame = self.draw_skeletons(np.zeros((height, width, 3), dtype=np.uint8), kp[i], c[i], (width, height), pids[i])
+                skel_frame = self.draw_skeletons(np.zeros((height, width, 3), dtype=np.uint8), kp[i], c[i], resolution=(width, height), pids=pids[i])
                 out.write(skel_frame)
         out.release()
 
@@ -122,7 +122,7 @@ class BaseVisualizer(ABC):
             ret, frame = cap.read()
             skel_frame = np.zeros_like(frame)
             if i < len(kp):
-                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], (width, height), pids[i])
+                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
             out.write(np.concatenate((frame, skel_frame), axis=1))
         cap.release()
         out.release()
@@ -137,7 +137,7 @@ class BaseVisualizer(ABC):
         for i in tqdm(range(length), desc="Writing video result"):
             ret, frame = cap.read()
             if ret:
-                frame = self.draw_skeletons(frame, kp[i], c[i], (width, height), pids[i])
+                frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
                 out.write(frame)
             else:
                 break

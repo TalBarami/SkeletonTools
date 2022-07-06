@@ -1,9 +1,10 @@
 import os
-from os import path
+from os import path as osp
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 # import torch.fft as fft
 from scipy.fftpack import fft
@@ -14,8 +15,10 @@ from tqdm import tqdm
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.skeleton_visualization.json_visualizer import JsonVisualizer
-from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS
+from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
 from skeleton_tools.utils.tools import read_json, get_video_properties
+pd.set_option('display.expand_frame_repr', False)
+sns.set_theme()
 
 
 def plot_fft(data_numpy, title, filename):
@@ -51,7 +54,7 @@ def plot_fft(data_numpy, title, filename):
             axs[1].axvline(7, color='r')
             axs[1].axvline(20, color='r')
     dst_path = r'D:\datasets\autism_center\fftfigs'
-    fig.savefig(path.join(dst_path, f'{filename}.png'), dpi=100)
+    fig.savefig(osp.join(dst_path, f'{filename}.png'), dpi=100)
     # plt.show()
 
 
@@ -93,19 +96,21 @@ def bar_plot_unique_children(df_path):
     plt.savefig('resources/figs/unique_children.png', bbox_inches='tight')
     plt.show()
 
+
 classmap = {0: 'Hand flapping',
-                1: 'Tapping',
-                2: 'Clapping',
-                3: 'Fingers',
-                4: 'Body rocking',
-                5: 'Tremor',
-                6: 'Spinning in circle',
-                7: 'Toe walking',
-                8: 'Back and forth',
-                9: 'Head movement',
-                10: 'Playing with object',
-                11: 'Jumping in place'}
+            1: 'Tapping',
+            2: 'Clapping',
+            3: 'Fingers',
+            4: 'Body rocking',
+            5: 'Tremor',
+            6: 'Spinning in circle',
+            7: 'Toe walking',
+            8: 'Back and forth',
+            9: 'Head movement',
+            10: 'Playing with object',
+            11: 'Jumping in place'}
 classmap = list(classmap.values())
+
 
 def plot_scores_heatmap(preds_df):
     v = []
@@ -119,6 +124,7 @@ def plot_scores_heatmap(preds_df):
     ax.figure.tight_layout()
     plt.savefig(r'resources/figs/heatmap.png')
     plt.show()
+
 
 def plot_conf_matrix(preds_df, norm=False):
     y_hat = preds_df['y']
@@ -134,6 +140,20 @@ def plot_conf_matrix(preds_df, norm=False):
     plt.savefig(r'resources/figs/confusion_matrix.png')
     plt.show()
 
+def draw_net_confidence(ax, jordi, agg, humans, threshold):
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1000))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    ax.text(0.01, 0.98, f"Threshold={threshold}", ha="left", va="top", transform=ax.transAxes, fontsize='60')
+    ax.set_xlim(xmin=0, xmax=jordi['end_frame'].max() - jordi['end_frame'].max() % -1000)
+    jordi['window'] = (jordi['start_frame'] + jordi['end_frame']) / 2
+    sns.lineplot(data=jordi, x='window', y='stereotypical_score', color='#264653', ax=ax)
+    for i, row in agg.iterrows():
+        ax.axvspan(row['start_frame'], row['end_frame'], alpha=.5, color='#FFBE0B')
+    for i, row in humans.iterrows():
+        ax.axvspan(row['start_frame'], row['end_frame'], alpha=.5, color='#3A86FF')
+
+
+
 def export_frames_for_figure():
     def export_frames(vis, skeleton_json, out_path):
         Path(out_path).mkdir(parents=True, exist_ok=True)
@@ -141,7 +161,7 @@ def export_frames_for_figure():
         for i in tqdm(range(length), desc="Writing video result"):
             if i < len(kp):
                 skel_frame = vis.draw_skeletons(np.zeros((height, width, 3), dtype=np.uint8), kp[i], c[i], (width, height), pids[i])
-                cv2.imwrite(path.join(out_path, f'{i}.png'), skel_frame)
+                cv2.imwrite(osp.join(out_path, f'{i}.png'), skel_frame)
 
     root = r'D:\datasets\taggin_hadas&dor_remake'
     files = ['100670545_Linguistic_Clinical_090720_0909_2_Spinning in circle_13543_14028.avi',
@@ -156,13 +176,39 @@ def export_frames_for_figure():
              '102105601_340358720_ADOS_070118_0932_1_Hand flapping_51780_52320.avi']
     v = JsonVisualizer(graph_layout=BODY_25_LAYOUT)
     for f in files:
-        name, ext = path.splitext(f)
-        j = read_json(path.join(root, 'skeletons', f'{name}.json'))
-        # v.create_double_frame_video(path.join(root, 'segmented_videos', f), j, f'C:/Users/owner/Desktop/out/{name}2{ext}')
+        name, ext = osp.splitext(f)
+        j = read_json(osp.join(root, 'skeletons', f'{name}.json'))
+        # v.create_double_frame_video(osp.join(root, 'segmented_videos', f), j, f'C:/Users/owner/Desktop/out/{name}2{ext}')
         export_frames(v, j, f'C:/Users/owner/Desktop/out/{name}')
 
 
 if __name__ == '__main__':
+    root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
+    assessment = '1007196724_ADOS_Clinical_190917_0000'
+    n = 4
+    files = [f'{assessment}_{i + 1}.MP4' for i in range(n)]
+    fig, axs = plt.subplots(n, figsize=(100, 20))
+    humans = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
+    for ax, file in zip(axs, files):
+        name = osp.splitext(file)[0]
+        jordi, agg = pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_scores.csv')), \
+                     pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'))
+        agg = agg[agg['movement'] == 1]
+        draw_net_confidence(ax,
+                            jordi,
+                            agg,
+                            humans[humans['video'] == file],
+                            0.8)
+    fig.show()
+    fig.savefig(osp.join(root, f'{assessment}.png'))
+    exit(1)
+
+    df = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3\1007196724_ADOS_Clinical_190917_0000_1\binary_weighted_extra_noact_epoch_18.pth\1007196724_ADOS_Clinical_190917_0000_1_annotations.csv')
+    df1 = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
+    df1 = df1[df1['video'] == '1007196724_ADOS_Clinical_190917_0000_1.MP4']
+    df = pd.concat((df, df1))
+    draw_net_confidence(df)
+    exit()
     df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     label = df['y']
     predict = np.argmax(df[df.columns[1:]].to_numpy(), axis=1)
@@ -172,7 +218,6 @@ if __name__ == '__main__':
     max_k_preds = np.argsort(scores, axis=1)[:, -3:][:, ::-1]
     match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
     topk_acc_score = match_array.sum() / match_array.shape[0]
-
 
     result = {s: (((predict == i) & (label == i)).sum() / (label == i).sum(), ((match_array == 1) & (label == i)).sum() / (label == i).sum()) for i, s in enumerate(REAL_DATA_MOVEMENTS[:-4])}
     for k, (v1, v2) in result.items():
@@ -193,7 +238,7 @@ if __name__ == '__main__':
     # vinfos = []
     # for root, dirs, files in os.walk(r'D:\datasets\tagging_hadas&dor\raw_videos'):
     #     for f in files:
-    #         vinfos.append(get_video_properties(path.join(root, f)))
+    #         vinfos.append(get_video_properties(osp.join(root, f)))
     # resolution = set([v[0] for v in vinfos])
     # fps = np.unique([v[1] for v in vinfos])
     # df_path = r'C:\Users\owner\PycharmProjects\RepetitiveMotionRecognition\resources\labels_complete_updated.csv'
@@ -202,7 +247,7 @@ if __name__ == '__main__':
     # skeletons_root = r'D:\datasets\autism_center\skeletons_filtered\data'
     # videos_root = r'D:\datasets\autism_center\segmented_videos'
     #
-    # files = [path.splitext(f)[0] for f in os.listdir(videos_root) if f.endswith('.avi')]
+    # files = [osp.splitext(f)[0] for f in os.listdir(videos_root) if f.endswith('.avi')]
     # files = [f for i, f in enumerate(files) if f'{f}.json' in set(os.listdir(skeletons_root))]
     # names = []
     #
@@ -214,7 +259,7 @@ if __name__ == '__main__':
     #               'Playing with object', 'Jumping in place', 'NoAction']:
     #     sub = [f for f in files if label in f]
     #     for filename in sub:
-    #         data = read_json(path.join(skeletons_root, f'{filename}.json'))['data']
+    #         data = read_json(osp.join(skeletons_root, f'{filename}.json'))['data']
     #         if len(data) < 40:
     #             print(f'Video is too short: {filename}')
     #             continue

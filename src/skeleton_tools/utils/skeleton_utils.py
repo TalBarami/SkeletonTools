@@ -190,7 +190,7 @@ def apply_noise(X, c, amplitude, cycle, offset, size):
 def get_interval(c, w, h):
     a = np.array(c) + np.array([w, h])
     b = np.array(c) - np.array([w, h])
-    return np.linalg.norm(a-b)
+    return np.linalg.norm(a - b)
 
 
 def add_repetitive_noise(data_numpy, amplitude, cycle, offset):
@@ -235,6 +235,7 @@ def centralize_json(pose_json):
                 s[src['name']] = [e for l in zip(xy[:, 0], xy[:, 1]) for e in l]
     return result
 
+
 def decentralize_json(pose_json, resolution):
     result = deepcopy(pose_json)
     for d in tqdm(result, ascii=True, desc='Centralizing'):
@@ -265,6 +266,7 @@ def normalize_json(pose_json, resolution, centralize=True):
                 s[src['name']] = [e for l in zip(x, y) for e in l]
     return result
 
+
 def denormalize_json(pose_json, resolution, centralized=True):
     result = deepcopy(pose_json)
     for d in tqdm(result, ascii=True, desc='Normalizing & Centralizing'):
@@ -278,6 +280,7 @@ def denormalize_json(pose_json, resolution, centralized=True):
                 s[src['name']] = [e for l in zip(xy[:, 0], xy[:, 1]) for e in l]
     return result
 
+
 def denormalize_numpy(data_numpy, resolution):
     x = data_numpy.copy()
     width, height = resolution
@@ -288,9 +291,11 @@ def denormalize_numpy(data_numpy, resolution):
     x[1] *= height
     return x
 
+
 def to_fft(data_numpy):
     ft = fp.fft(data_numpy[0, :, :, :] + 1j * data_numpy[1, :, :, :], axis=2)
     return np.concatenate((np.expand_dims(ft.real, axis=0), np.expand_dims(ft.imag, axis=0)))
+
 
 # def add_repetitive_noise_json(json_file, amplitude, cycle, offset):
 #     j_copy = deepcopy(json_file)
@@ -331,21 +336,61 @@ def to_fft(data_numpy):
 #     }
 #     return box
 
+def get_iou(_bb1, _bb2):
+    def convert(bb):
+        return {'x1': bb[0][0] - bb[1][0] // 2,
+                'y1': bb[0][1] - bb[1][1] // 2,
+                'x2': bb[0][0] + bb[1][0] // 2,
+                'y2': bb[0][1] + bb[1][1] // 2}
+    bb1 = convert(_bb1)
+    bb2 = convert(_bb2)
+
+    assert bb1['x1'] <= bb1['x2']
+    assert bb1['y1'] <= bb1['y2']
+    assert bb2['x1'] <= bb2['x2']
+    assert bb2['y1'] <= bb2['y2']
+
+    # determine the coordinates of the intersection rectangle
+    x_left = max(bb1['x1'], bb2['x1'])
+    y_top = max(bb1['y1'], bb2['y1'])
+    x_right = min(bb1['x2'], bb2['x2'])
+    y_bottom = min(bb1['y2'], bb2['y2'])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    # The intersection of two axis-aligned bounding boxes is always an
+    # axis-aligned bounding box
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+
+    # compute the area of both AABBs
+    bb1_area = (bb1['x2'] - bb1['x1']) * (bb1['y2'] - bb1['y1'])
+    bb2_area = (bb2['x2'] - bb2['x1']) * (bb2['y2'] - bb2['y1'])
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = intersection_area / float(bb1_area + bb2_area - intersection_area)
+    assert iou >= 0.0
+    assert iou <= 1.0
+    return iou
+
+
 def box_distance(b1, b2):
     c1, _ = b1
     c2, _ = b2
     return np.linalg.norm(c1 - c2)
 
-def bounding_box(pose, score):
+
+def bounding_box(pose, score, epsilon=EPSILON):
     pose, score = np.array(pose), np.array(score)
-    x, y = pose[0][score > EPSILON], pose[1][score > EPSILON]
+    x, y = pose[0][score > epsilon], pose[1][score > epsilon]
     if not any(x):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
     w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
     return np.array((np.min(x) + w / 2, np.min(y) + h / 2)), np.array((w, h))
-
 
 
 def openpose_match(data_numpy):

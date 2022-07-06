@@ -13,9 +13,9 @@ class JsonVisualizer(BaseVisualizer):
 
     def get_video_info(self, video_path, skeleton_json):
         if video_path is None:
-            (width, height), fps, length = skeleton_json['resolution'], skeleton_json['fps'], skeleton_json['length']
+            (width, height), fps, frames_count = skeleton_json['resolution'], skeleton_json['fps'], skeleton_json['length']
         else:
-            (width, height), fps, length = get_video_properties(video_path)
+            (width, height), fps, frames_count, _ = get_video_properties(video_path)
 
         kp = []
         c = []
@@ -26,4 +26,4 @@ class JsonVisualizer(BaseVisualizer):
             c.append(np.array([s['pose_score'] for s in skeletons]))
             pids.append([s['person_id'] for s in skeletons])
 
-        return fps, length, (width, height), kp, c, pids
+        return fps, int(frames_count), (width, height), kp, c, pids
