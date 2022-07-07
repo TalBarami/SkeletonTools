@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.patches import Patch
 import numpy as np
 # import torch.fft as fft
 from scipy.fftpack import fft
@@ -140,18 +141,65 @@ def plot_conf_matrix(preds_df, norm=False):
     plt.savefig(r'resources/figs/confusion_matrix.png')
     plt.show()
 
-def draw_net_confidence(ax, jordi, agg, humans, threshold):
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(1000))
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
-    ax.text(0.01, 0.98, f"Threshold={threshold}", ha="left", va="top", transform=ax.transAxes, fontsize='60')
-    ax.set_xlim(xmin=0, xmax=jordi['end_frame'].max() - jordi['end_frame'].max() % -1000)
+def get_intersection(interval1, interval2):
+    new_min = max(interval1[0], interval2[0])
+    new_max = min(interval1[1], interval2[1])
+    return [new_min, new_max] if new_min <= new_max else None
+
+def draw_net_confidence(ax, jordi, agg, humans):
     jordi['window'] = (jordi['start_frame'] + jordi['end_frame']) / 2
     sns.lineplot(data=jordi, x='window', y='stereotypical_score', color='#264653', ax=ax)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1000))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    ax.set_xlim(xmin=0, xmax=jordi['end_frame'].max() - jordi['end_frame'].max() % -1000)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     for i, row in agg.iterrows():
         ax.axvspan(row['start_frame'], row['end_frame'], alpha=.5, color='#FFBE0B')
     for i, row in humans.iterrows():
         ax.axvspan(row['start_frame'], row['end_frame'], alpha=.5, color='#3A86FF')
 
+    jordi_intervals = agg[['start_frame', 'end_frame']].values.tolist()
+    human_intervals = humans[['start_frame', 'end_frame']].values.tolist()
+    intersection = [x for x in (get_intersection(y, z) for y in jordi_intervals for z in human_intervals) if x is not None]
+    intersection_length = sum([(t - s) for s, t in intersection])
+    union_length = sum([(t-s) for s,t in (jordi_intervals + human_intervals)]) - intersection_length
+    ax.text(0.005, 0.92, f'IoU: {round(intersection_length / union_length * 100)}%', fontsize=25, ha='left', va='center', transform=ax.transAxes)
+
+
+def aggregate_b(df): # TODO: Decide if using
+    _df = pd.DataFrame(columns=df.columns)
+    for i in range(0, df['end_frame'].max(), 30):
+        sdf = df[(df['start_frame'] <= i) & (i < df['end_frame'])]
+        _df.loc[_df.shape[0]] = [df['video'].loc[0], -1, -1, i, i + 30, -1, pd.to_datetime('now'), 'JORDI', sdf['stereotypical_score'].mean()]
+    return _df
+
+def draw_confidence_for_assessment(root, assessment, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv'):
+    files = [f for f in os.listdir(root) if assessment in f and osp.isdir(osp.join(root, f))]
+    fig, axs = plt.subplots(len(files), figsize=(100, 20))
+    fig.text(0.513, 0.98, r'$\bf{Model\ score\ for\ assessment:}$' + assessment.replace("_", " "), ha='center', va='top', size=60)
+    fig.text(0.513, 0.9, f'Score threshold: {0.8}', ha='center', va='top', size=40)
+    fig.text(0.513, 0.06, 'Frame', ha='center', size=45)
+    fig.text(0.002, 0.5, 'Score', va='center', rotation='vertical', size=45)
+    legend_elements = [Patch(facecolor='#FFBE0B', label='Jordi'),
+                       Patch(facecolor='#3A86FF', label='Human')]
+    fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.99, 0.95), fancybox=True, framealpha=0.5, fontsize=40)
+    humans = pd.read_csv(human_labels_path)
+    humans['basename'] = humans['video'].apply(lambda v: osp.splitext(v)[0])
+    for ax, file in zip(axs, files):
+        camid = file.split('_')[-1][0]
+        name = osp.splitext(file)[0]
+        jordi, agg = pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_scores.csv')), \
+                     pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'))
+        agg = agg[(agg['movement'] == 1) | (agg['movement'] == 'Stereotypical')]
+        draw_net_confidence(ax,
+                            jordi,
+                            agg,
+                            humans[humans['basename'] == file])
+        ax.set_ylabel(f'Camera {camid}', size=25)
+    fig.tight_layout(rect=[0.01, 0.1, 0.99, 0.85])
+    fig.show()
+    fig.savefig(osp.join(root, f'{assessment}.png'))
 
 
 def export_frames_for_figure():
@@ -184,56 +232,36 @@ def export_frames_for_figure():
 
 if __name__ == '__main__':
     root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
-    assessment = '1007196724_ADOS_Clinical_190917_0000'
-    n = 4
-    files = [f'{assessment}_{i + 1}.MP4' for i in range(n)]
-    fig, axs = plt.subplots(n, figsize=(100, 20))
-    humans = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
-    for ax, file in zip(axs, files):
-        name = osp.splitext(file)[0]
-        jordi, agg = pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_scores.csv')), \
-                     pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'))
-        agg = agg[agg['movement'] == 1]
-        draw_net_confidence(ax,
-                            jordi,
-                            agg,
-                            humans[humans['video'] == file],
-                            0.8)
-    fig.show()
-    fig.savefig(osp.join(root, f'{assessment}.png'))
-    exit(1)
+    assessments = set(['_'.join(d.split('_')[:-2]) for d in os.listdir(root) if osp.isdir(osp.join(root, d))][:20])
+    # draw_confidence_for_assessment(root, '1012018123_ADOS_Clinical_190218')
+    for a in assessments:
+        draw_confidence_for_assessment(root, a)
 
-    df = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3\1007196724_ADOS_Clinical_190917_0000_1\binary_weighted_extra_noact_epoch_18.pth\1007196724_ADOS_Clinical_190917_0000_1_annotations.csv')
-    df1 = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
-    df1 = df1[df1['video'] == '1007196724_ADOS_Clinical_190917_0000_1.MP4']
-    df = pd.concat((df, df1))
-    draw_net_confidence(df)
-    exit()
-    df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
-    label = df['y']
-    predict = np.argmax(df[df.columns[1:]].to_numpy(), axis=1)
-
-    labels = np.array(label)[:, np.newaxis]
-    scores = df[df.columns[1:]].to_numpy()
-    max_k_preds = np.argsort(scores, axis=1)[:, -3:][:, ::-1]
-    match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
-    topk_acc_score = match_array.sum() / match_array.shape[0]
-
-    result = {s: (((predict == i) & (label == i)).sum() / (label == i).sum(), ((match_array == 1) & (label == i)).sum() / (label == i).sum()) for i, s in enumerate(REAL_DATA_MOVEMENTS[:-4])}
-    for k, (v1, v2) in result.items():
-        print(f'{k} & {int(v1 * 100)}\\% & {int(v2 * 100)}\\% \\\\')
-    plot_conf_matrix(df, norm=True)
-    plot_scores_heatmap(df)
-
-    df2 = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa\test.csv')
-    label2 = df2['y']
-    predict2 = np.argmax(df2[df2.columns[1:]].to_numpy(), axis=1)
-
-    for i, c in enumerate(REAL_DATA_MOVEMENTS[:-4]):
-        ft_correct = np.round((np.mean((label == i) & (predict == i) & (predict2 != i)) * 100), 3)
-        ft_mistake = np.round((np.mean((label == i) & (predict != i) & (predict2 == i)) * 100), 3)
-        print(i, c, f'fine_tune: {ft_correct}%', f'scratch: {ft_mistake}%')
-    print(np.sum((label == predict) & (label != predict2)) - np.sum((label != predict) & (label == predict2)))
+    # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
+    # label = df['y']
+    # predict = np.argmax(df[df.columns[1:]].to_numpy(), axis=1)
+    #
+    # labels = np.array(label)[:, np.newaxis]
+    # scores = df[df.columns[1:]].to_numpy()
+    # max_k_preds = np.argsort(scores, axis=1)[:, -3:][:, ::-1]
+    # match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
+    # topk_acc_score = match_array.sum() / match_array.shape[0]
+    #
+    # result = {s: (((predict == i) & (label == i)).sum() / (label == i).sum(), ((match_array == 1) & (label == i)).sum() / (label == i).sum()) for i, s in enumerate(REAL_DATA_MOVEMENTS[:-4])}
+    # for k, (v1, v2) in result.items():
+    #     print(f'{k} & {int(v1 * 100)}\\% & {int(v2 * 100)}\\% \\\\')
+    # plot_conf_matrix(df, norm=True)
+    # plot_scores_heatmap(df)
+    #
+    # df2 = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa\test.csv')
+    # label2 = df2['y']
+    # predict2 = np.argmax(df2[df2.columns[1:]].to_numpy(), axis=1)
+    #
+    # for i, c in enumerate(REAL_DATA_MOVEMENTS[:-4]):
+    #     ft_correct = np.round((np.mean((label == i) & (predict == i) & (predict2 != i)) * 100), 3)
+    #     ft_mistake = np.round((np.mean((label == i) & (predict != i) & (predict2 == i)) * 100), 3)
+    #     print(i, c, f'fine_tune: {ft_correct}%', f'scratch: {ft_mistake}%')
+    # print(np.sum((label == predict) & (label != predict2)) - np.sum((label != predict) & (label == predict2)))
 
     # vinfos = []
     # for root, dirs, files in os.walk(r'D:\datasets\tagging_hadas&dor\raw_videos'):
