@@ -15,7 +15,7 @@ class Splitter(Dataset):
         self.N, self.T, self.J, self.C = self.skeleton['keypoint'].shape
 
         self.intervals = [(x, min(x+self.sequence_length, self.T)) for x in range(0, max(self.T, self.T - self.sequence_length + self.step_size), self.step_size) if (min(x+self.sequence_length, self.T) - x) >= self.min_length]
-        self.template = {k: v for k, v in self.skeleton.items() if k not in ['keypoint', 'keypoint_score', 'total_frames', 'frame_dir']}
+        self.template = {k: v for k, v in self.skeleton.items() if k not in ['keypoint', 'keypoint_score', 'total_frames', 'frame_dir', 'child_detected']}
         self.template['basename'] = self.skeleton['frame_dir']
 
     def __getitem__(self, index):
