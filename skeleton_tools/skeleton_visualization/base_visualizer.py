@@ -23,7 +23,7 @@ class BaseVisualizer(ABC):
         self.blur_face = blur_face
         self.show_confidence = show_confidence
 
-    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, resolution=None, pids=None):
+    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, resolution=None, pids=None, child_id=None):
         img = np.copy(frame)
 
         if pids is None:
@@ -42,8 +42,11 @@ class BaseVisualizer(ABC):
                     for p in ps:
                         img = self.blur_area(img, tuple(p), 100)
 
-        for pose, score, pid in zip(skeletons, scores, pids):
-            color = tuple(reversed(COLORS[(pid % len(COLORS))]['value']))
+        for lst_id, (pose, score, pid) in enumerate(zip(skeletons, scores, pids)):
+            if child_id is None:
+                color = tuple(reversed(COLORS[(pid % len(COLORS))]['value']))
+            else:
+                color = (0, 0, 255) if child_id == lst_id else (255, 0, 0)
             if img.shape[-1] > 3:
                 color += (255,)
 
@@ -127,7 +130,7 @@ class BaseVisualizer(ABC):
         cap.release()
         out.release()
 
-    def create_video(self, video_path, skeleton_data, out_path):
+    def create_video(self, video_path, skeleton_data, out_path, child_ids=None):
         fps, length, (width, height), kp, c, pids = self.get_video_info(video_path, skeleton_data)
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -137,7 +140,8 @@ class BaseVisualizer(ABC):
         for i in tqdm(range(length), desc="Writing video result"):
             ret, frame = cap.read()
             if ret:
-                frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
+                cid = child_ids[i] if child_ids is not None else None
+                frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=cid)
                 out.write(frame)
             else:
                 break
