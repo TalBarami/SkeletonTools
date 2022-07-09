@@ -174,7 +174,7 @@ def aggregate_b(df): # TODO: Decide if using
         _df.loc[_df.shape[0]] = [df['video'].loc[0], -1, -1, i, i + 30, -1, pd.to_datetime('now'), 'JORDI', sdf['stereotypical_score'].mean()]
     return _df
 
-def draw_confidence_for_assessment(files, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv'):
+def draw_confidence_for_assessment(root, files, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv'):
     assessment = ' '.join(files[0].split('_')[:-2])
     fig, axs = plt.subplots(len(files), figsize=(100, 20))
     fig.text(0.513, 0.98, r'$\bf{Model\ score\ for\ assessment:}$' + assessment, ha='center', va='top', size=60)
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     for a in assessments:
         files = [d for d in os.listdir(root) if a in d and osp.exists(osp.join(root, d, 'binary_weighted_extra_noact_epoch_18.pth', f'{d}_annotations.csv'))]
         if len(files) > 0:
-            draw_confidence_for_assessment(files)
+            draw_confidence_for_assessment(root, files)
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']
