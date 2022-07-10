@@ -26,7 +26,7 @@ class SkeletonSource(Enum):
 
 
 class OpenposeInitializer:
-    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=1, open_pose_path='C:/research/openpose'):
+    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path='C:/research/openpose'):
         self.layout = openpose_layout
         self.C = in_channels
         self.T = length
@@ -37,6 +37,8 @@ class OpenposeInitializer:
 
     def _exec_openpose(self, src_path, skeleton_dst=None, source_type=SkeletonSource.VIDEO):
         Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
+        if src_path.startswith('\\\\'):
+            src_path = f'\\{src_path}'
         params = {
             source_type.value: f'\"{src_path}\"',
             'model_pose': self.layout.model_pose,

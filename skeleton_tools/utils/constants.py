@@ -1,5 +1,5 @@
 import matplotlib.colors as mcolors
-from os import path
+from os import path as osp
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.openpose_layouts.face import FACE_LAYOUT
@@ -7,7 +7,12 @@ from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
 NET_NAME = 'JORDI'
 NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
-REMOTE_STORAGE = path.join(r'\\ac-s1', 'Data', 'Autism Center')
+REMOTE_STORAGE = osp.join(r'\\ac-s1', 'Data', 'Autism Center')
+
+OPENPOSE_ROOT = r'E:\research\openpose'
+MMACTION_ROOT = r'E:\research\mmaction2'
+MMLAB_ENV_ROOT = r'C:\Users\owner\anaconda3\envs\open-mmlab\python.exe'
+ANNOTATIONS_ROOT = osp.join(REMOTE_STORAGE, r'Users\TalBarami\annotations\labels.csv')
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
