@@ -11,8 +11,15 @@ import pandas as pd
 import numpy as np
 import cv2
 
+from skeleton_tools.utils.constants import REMOTE_STORAGE
 
-def get_videos(root=r'Z:\recordings'):
+def init_logged(log_path='resources/log.txt'):
+    logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s',
+                        datefmt='%d/%m/%Y %H:%M:%S')
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logging.info('Initialization Success')
+
+def get_videos(root=osp.join(REMOTE_STORAGE, 'recordings')):
     video_files = {}
     for dir_path, dirs, files in os.walk(root):
         for file in files:
