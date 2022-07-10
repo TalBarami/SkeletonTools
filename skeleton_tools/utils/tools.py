@@ -13,7 +13,7 @@ import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
-def init_logged(log_path='resources/log.txt'):
+def init_logger(log_path='resources/log.txt'):
     logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%d/%m/%Y %H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler())
