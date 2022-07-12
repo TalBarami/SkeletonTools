@@ -16,6 +16,7 @@ class MMPoseVisualizer(BaseVisualizer):
         width, height = int(width), int(height)
         kp = skeleton_data['keypoint'].transpose((1, 0, 2, 3))
         c = skeleton_data['keypoint_score'].transpose((1, 0, 2))
+        child_ids = skeleton_data['child_ids'] if 'child_ids' in skeleton_data.keys() else None
         pids = [np.arange(p.shape[0]) for p in kp]
 
-        return fps, length, (width, height), kp, c, pids
+        return fps, length, (width, height), kp, c, pids, child_ids
