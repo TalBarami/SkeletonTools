@@ -21,10 +21,12 @@ def unify(df):
     i = 0
     while i < n:
         curr = df.iloc[i]
+        if i > 28:
+            print()
         if curr['movement'] == 'Stereotypical':
             merge = [curr]
             j = i + 2
-            while j < df.shape[0] - 2:
+            while j < df.shape[0] - 1:
                 next_row = df.iloc[j]
                 if next_row['start_frame'] < curr['end_frame']:
                     merge.append(next_row)
@@ -161,6 +163,18 @@ def evaluate_threshold(scores, human_labels):
     plt.show()
 
 if __name__ == '__main__':
+    file = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3\1007196724_ADOS_Clinical_190917_0000_2\binary_weighted_extra_noact_epoch_18.pth\1007196724_ADOS_Clinical_190917_0000_2_scores.csv'
+    df = pd.read_csv(file)
+    agg = aggregate(df, 0.8)
+    print()
+    # root = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
+    # files = [(f, osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv')) for f in os.listdir(root) if osp.isdir(osp.join(root, f))]
+    # files = [(name, file) for (name, file) in files if osp.exists(file)]
+    # for name, file in files:
+    #     df = pd.read_csv(file)
+    #     agg = aggregate(df, 0.8)
+    #     agg.to_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'), index=False)
+    # exit()
     root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
     human_labels = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
     names = human_labels['video'].apply(lambda v: osp.splitext(v)[0]).unique()
