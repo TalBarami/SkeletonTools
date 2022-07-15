@@ -21,8 +21,6 @@ def unify(df):
     i = 0
     while i < n:
         curr = df.iloc[i]
-        if i > 28:
-            print()
         if curr['movement'] == 'Stereotypical':
             merge = [curr]
             j = i + 2
@@ -108,24 +106,19 @@ def evaluate(df, ground_truth, min_iou=0.1):
     human_intervals = ground_truth[ground_truth['video'] == df['video'].values[0]][['start_frame', 'end_frame']].values.tolist()
 
     for i, row in model.iterrows():
-        try:
-            model_interval = row[['start_frame', 'end_frame']].values.tolist()
-            movement = row['movement']
-            ious = [x for x in (iou_1d(model_interval, human_interval) for human_interval in human_intervals) if x is not None]
-            if movement == 1:
-                miss, hit = row['segment_length'], 0
-                if len(ious) > 0 and any(iou > min_iou for iou in ious):
-                    hit, miss = miss, hit
-                # if len(ious) > 1:
-                #         print(f"WTF!!! {row['video']}")
-            else:
-                intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
-                intersections = [intersect for intersect, interval in intersections if intersect == interval]
-                miss = np.sum([high - low for (low, high) in intersections])
-                hit = row['segment_length'] - miss
-            model.loc[i, ['hit_score', 'miss_score']] = hit, miss
-        except Exception as e:
-            print(1)
+        model_interval = row[['start_frame', 'end_frame']].values.tolist()
+        movement = row['movement']
+        ious = [x for x in (iou_1d(model_interval, human_interval) for human_interval in human_intervals) if x is not None]
+        if movement == 1:
+            miss, hit = row['segment_length'], 0
+            if len(ious) > 0 and any(iou > min_iou for iou in ious):
+                hit, miss = miss, hit
+        else:
+            intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
+            intersections = [intersect for intersect, interval in intersections if intersect == interval]
+            miss = np.sum([high - low for (low, high) in intersections])
+            hit = row['segment_length'] - miss
+        model.loc[i, ['hit_score', 'miss_score']] = hit, miss
 
     total_length = model['end_frame'].max()
     tp = model[model['movement'] == 1]['hit_score'].sum()
@@ -163,18 +156,14 @@ def evaluate_threshold(scores, human_labels):
     plt.show()
 
 if __name__ == '__main__':
-    file = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3\1007196724_ADOS_Clinical_190917_0000_2\binary_weighted_extra_noact_epoch_18.pth\1007196724_ADOS_Clinical_190917_0000_2_scores.csv'
-    df = pd.read_csv(file)
-    agg = aggregate(df, 0.8)
-    print()
-    # root = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
-    # files = [(f, osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv')) for f in os.listdir(root) if osp.isdir(osp.join(root, f))]
-    # files = [(name, file) for (name, file) in files if osp.exists(file)]
-    # for name, file in files:
-    #     df = pd.read_csv(file)
-    #     agg = aggregate(df, 0.8)
-    #     agg.to_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'), index=False)
-    # exit()
+    root = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
+    files = [(f, osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv')) for f in os.listdir(root) if osp.isdir(osp.join(root, f))]
+    files = [(name, file) for (name, file) in files if osp.exists(file)]
+    for name, file in files:
+        df = pd.read_csv(file)
+        agg = aggregate(df, 0.8)
+        agg.to_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'), index=False)
+    exit()
     root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
     human_labels = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
     names = human_labels['video'].apply(lambda v: osp.splitext(v)[0]).unique()
