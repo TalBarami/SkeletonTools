@@ -5,7 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from skeleton_tools.utils.constants import NET_NAME
+from skeleton_tools.utils.constants import NET_NAME, REMOTE_STORAGE
+
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
 
@@ -144,28 +145,29 @@ def evaluate_threshold(scores, human_labels):
         # c.append(np.nanmean(conf_mat, axis=0))
         p.append(np.nanmean(precision))
         r.append(np.nanmean(recall))
+    return thresholds, p, r
 
-    df = pd.DataFrame(columns=['threshold', 'precision', 'recall'], data=np.array([thresholds, p, r]).T)
+if __name__ == '__main__':
+    root = osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3')
+    human_labels1 = pd.read_csv(osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_labels.csv'))
+    human_labels2 = pd.read_csv(osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\annotations\labels_post_qa.csv'))
+    names = human_labels2['video'].apply(lambda v: osp.splitext(v)[0]).unique()
+    human_labels1 = human_labels1[human_labels1['video'].apply(lambda v: osp.splitext(v)[0]).isin(names)]
+    files = [x for x in (osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv') for f in os.listdir(root) if f in names) if osp.exists(x)]
+    t1, p1, r1 = evaluate_threshold(files, human_labels1)
+    t2, p2, r2 = evaluate_threshold(files, human_labels2)
+    df1 = pd.DataFrame(columns=['threshold', 'precision', 'recall'], data=np.array([t1, p1, r1]).T)
+    df1['annotations'] = 'Old'
+    df2 = pd.DataFrame(columns=['threshold', 'precision', 'recall'], data=np.array([t2, p2, r2]).T)
+    df2['annotations'] = 'New'
+    df = pd.concat((df1, df2)).reset_index(drop=True)
     fig, ax = plt.subplots()
-    sns.lineplot(data=df, x='recall', y='precision', marker='o')
+    sns.lineplot(data=df, x='recall', y='precision', marker='o', hue='annotations')
     for _, row in df.iterrows():
-        ax.text(x=row['recall'] + 0.005, y=row['precision'] + 0.005, s=row['threshold'], bbox=dict(facecolor='lightblue', alpha=0.5))
+        ax.text(x=row['recall'] + 0.005, y=row['precision'] + 0.005, s=row['threshold'],
+                bbox=dict(facecolor='lightblue', alpha=0.5))
     ax.set_title('Precision-Recall Curve')
     ax.set_ylabel('Precision')
     ax.set_xlabel('Recall')
     plt.show()
 
-if __name__ == '__main__':
-    root = r'S:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
-    files = [(f, osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv')) for f in os.listdir(root) if osp.isdir(osp.join(root, f))]
-    files = [(name, file) for (name, file) in files if osp.exists(file)]
-    for name, file in files:
-        df = pd.read_csv(file)
-        agg = aggregate(df, 0.8)
-        agg.to_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'), index=False)
-    exit()
-    root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3'
-    human_labels = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv')
-    names = human_labels['video'].apply(lambda v: osp.splitext(v)[0]).unique()
-    files = [x for x in (osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv') for f in os.listdir(root) if f in names) if osp.exists(x)]
-    evaluate_threshold(files, human_labels)
