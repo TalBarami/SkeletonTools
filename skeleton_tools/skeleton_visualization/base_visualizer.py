@@ -1,16 +1,12 @@
-import os
-from os import path
 from abc import ABC, abstractmethod
 
+from os import path as osp
 import cv2
 import numpy as np
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
-from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.utils.constants import COLORS, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
-from skeleton_tools.utils.tools import read_json
 
 
 class BaseVisualizer(ABC):
@@ -68,7 +64,7 @@ class BaseVisualizer(ABC):
             joint_color += (255,)
         for (v1, v2) in self.graph_layout.pairs():
             if score[v1] > epsilon and score[v2] > epsilon:
-                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=2, lineType=cv2.LINE_AA)
+                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=5, lineType=cv2.LINE_AA)
         # for i, (x, y) in enumerate(pose):
         #     if score[i] > epsilon:
         #         jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else (joint_color, 2)
@@ -147,6 +143,32 @@ class BaseVisualizer(ABC):
         cap.release()
         out.release()
 
+    def to_image(self, frame):
+        top, bottom, left, right = [20] * 4
+        frame = cv2.copyMakeBorder(frame, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(128,128,128))
+        frame[:, :, 3] = (255 * np.where((frame[:, :, :3] != 255).any(axis=2), 1, 0.6)).astype(np.uint8)
+        return frame
+
+    def sample_frames(self, video_path, skeleton_data, frame_idxs, out_dir):
+        fps, frames_count, (width, height), kp, c, pids, child_ids = self.get_video_info(video_path, skeleton_data)
+        cap = cv2.VideoCapture(video_path)
+        white = np.ones((height, width, 4)) * 255
+
+        for i in frame_idxs:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = cap.read()
+            frame = np.concatenate((frame, np.zeros((height, width, 1))), axis=2)
+            frame[:, :, 3] = (255 * (frame[:, :, :3] != 255).any(axis=2)).astype(np.uint8)
+            if ret:
+                skeleton = self.draw_skeletons(np.copy(white), kp[i], c[i], pids=np.ones(kp.shape[0], dtype='uint8') * 0)
+                skeleton = self.to_image(skeleton)
+                skeleton_child_detect = self.draw_skeletons(np.copy(white), kp[i], c[i], child_id=child_ids[i])
+                skeleton_child_detect = self.to_image(skeleton_child_detect)
+                cv2.imwrite(osp.join(out_dir, f'org_{i}.png'), frame)
+                cv2.imwrite(osp.join(out_dir, f'skeleton_{i}.png'), skeleton)
+                cv2.imwrite(osp.join(out_dir, f'skeleton_cd_{i}.png'), skeleton_child_detect)
+
+
     @abstractmethod
     def get_video_info(self, video_path, skeleton_data):
         pass
@@ -196,15 +218,3 @@ class BaseVisualizer(ABC):
     #         cap.release()
     #     if out is not None:
     #         out.release()
-
-
-if __name__ == '__main__':
-    skel_root = r'D:\datasets\autism_center_take2\skeletons'
-    vids_root = r'D:\datasets\autism_center_take2\segmented_videos'
-    out_dir = r'D:\datasets\autism_center_take2\new_videos'
-    v = BaseVisualizer()
-    for file in os.listdir(skel_root):
-        name, ext = path.splitext(file)
-        v_name = f'{name}.avi' if path.exists(path.join(vids_root, f'{name}.avi')) else f'{name}.mp4'
-        skel = read_json(path.join(skel_root, file))
-        v.make_video(path.join(vids_root, v_name), skel, path.join(out_dir, v_name), is_normalized=False, display_pid=True)

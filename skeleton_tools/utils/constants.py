@@ -9,11 +9,12 @@ NET_NAME = 'JORDI'
 NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
 REMOTE_STORAGE = osp.join(r'\\ac-s1', 'Data', 'Autism Center')
 
-OPENPOSE_ROOT = r'E:\research\openpose'
-MMACTION_ROOT = r'E:\research\mmaction2'
-MMLAB_ENV_PATH = r'C:\Users\owner\anaconda3\envs\open-mmlab\python.exe'
+OPENPOSE_ROOT = r'C:\research\openpose'
+MMACTION_ROOT = r'C:\research\mmaction2'
+MMLAB_ENV_PATH = r'C:\Users\owner\anaconda3\envs\mmlab\python.exe'
 DB_PATH = osp.join(REMOTE_STORAGE, r'Users\TalBarami\NAS_database_final.csv')
 ANNOTATIONS_PATH = osp.join(REMOTE_STORAGE, r'Users\TalBarami\lancet_submission_data\annotations\labels.csv')
+
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                        'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth', 'Head movement',
