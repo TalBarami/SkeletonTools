@@ -338,10 +338,10 @@ def to_fft(data_numpy):
 
 def get_iou(_bb1, _bb2):
     def convert(bb):
-        return {'x1': bb[0][0] - bb[1][0] // 2,
-                'y1': bb[0][1] - bb[1][1] // 2,
-                'x2': bb[0][0] + bb[1][0] // 2,
-                'y2': bb[0][1] + bb[1][1] // 2}
+        return {'x1': bb[0] - bb[2] // 2,
+                'y1': bb[1] - bb[3] // 2,
+                'x2': bb[0] + bb[2] // 2,
+                'y2': bb[1] + bb[3] // 2}
     bb1 = convert(_bb1)
     bb2 = convert(_bb2)
 
@@ -390,7 +390,7 @@ def bounding_box(pose, score, epsilon=EPSILON):
     if not any(y):
         y = np.array([0])
     w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
-    return np.array((np.min(x) + w / 2, np.min(y) + h / 2)), np.array((w, h))
+    return np.array([np.min(x) + w / 2, np.min(y) + h / 2, w, h])
 
 
 def openpose_match(data_numpy):

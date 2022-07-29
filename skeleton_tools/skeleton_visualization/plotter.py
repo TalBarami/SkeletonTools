@@ -17,7 +17,8 @@ from tqdm import tqdm
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.skeleton_visualization.json_visualizer import JsonVisualizer
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
-from skeleton_tools.utils.tools import read_json, get_video_properties
+from skeleton_tools.utils.tools import read_json, get_video_properties, init_directories
+
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
 
@@ -174,7 +175,8 @@ def aggregate_b(df): # TODO: Decide if using
         _df.loc[_df.shape[0]] = [df['video'].loc[0], -1, -1, i, i + 30, -1, pd.to_datetime('now'), 'JORDI', sdf['stereotypical_score'].mean()]
     return _df
 
-def draw_confidence_for_assessment(root, files, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv'):
+def draw_confidence_for_assessment(root, files, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv', show=False):
+    init_directories(osp.join(root, 'figs'))
     assessment = ' '.join(files[0].split('_')[:-2])
     fig, axs = plt.subplots(len(files), figsize=(100, 20))
     fig.text(0.513, 0.98, r'$\bf{Model\ score\ for\ assessment:}$' + assessment, ha='center', va='top', size=60)
@@ -198,8 +200,9 @@ def draw_confidence_for_assessment(root, files, human_labels_path=r'Z:\Users\Tal
                             humans[humans['basename'] == file])
         ax.set_ylabel(f'Camera {camid}', size=25)
     fig.tight_layout(rect=[0.01, 0.1, 0.99, 0.85])
-    fig.show()
-    fig.savefig(osp.join(root, f'{assessment}.png'))
+    if show:
+        fig.show()
+    fig.savefig(osp.join(root, 'figs', f'{assessment}.png'))
 
 
 def export_frames_for_figure():
