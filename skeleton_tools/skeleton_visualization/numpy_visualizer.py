@@ -19,6 +19,7 @@ class MMPoseVisualizer(BaseVisualizer):
         child_ids = skeleton_data['child_ids'] if 'child_ids' in skeleton_data.keys() else None
         detections = skeleton_data['child_detected'] if 'child_detected' in skeleton_data.keys() else None
         child_bbox = skeleton_data['child_bbox'] if 'child_bbox' in skeleton_data.keys() else None
+        adjust = skeleton_data['adjustment'] if 'adjustment' in skeleton_data.keys() else 0
         pids = [np.arange(p.shape[0]) for p in kp]
 
-        return fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox
+        return fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust

@@ -26,4 +26,4 @@ class JsonVisualizer(BaseVisualizer):
             c.append(np.array([s['pose_score'] for s in skeletons]))
             pids.append([s['person_id'] for s in skeletons])
 
-        return fps, int(frames_count), (width, height), kp, c, pids, None, None, None
+        return fps, int(frames_count), (width, height), kp, c, pids, None, None, None, 0

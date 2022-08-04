@@ -134,15 +134,18 @@ class BaseVisualizer(ABC):
         out.release()
 
     def create_video(self, video_path, skeleton_data, out_path):
-        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox = self.get_video_info(video_path, skeleton_data)
+        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton_data)
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
         cap = cv2.VideoCapture(video_path)
 
-        for i in tqdm(range(length), desc="Writing video result"):
+        for j in tqdm(range(length), desc="Writing video result"):
             ret, frame = cap.read()
             if ret:
+                if j < adjust:
+                    continue
+                i = j - adjust
                 if child_ids is not None:
                     frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
                 else:
