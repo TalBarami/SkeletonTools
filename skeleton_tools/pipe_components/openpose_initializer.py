@@ -82,6 +82,7 @@ class OpenposeInitializer:
                 'fps': fps,
                 'frame_count': frame_count,
                 'length_seconds': length,
+                'adjust': frame_count - len(data),
                 'data': data
             }
             if result_skeleton_dir:
@@ -229,6 +230,7 @@ class OpenposeInitializer:
             'img_shape': json_file['resolution'],
             'original_shape': json_file['resolution'],
             'fps': json_file['fps'],
+            'adjust': json_file['adjust'],
             'total_frames': len(json_file['data']),
         }
         if label is not None and label_index is not None:
