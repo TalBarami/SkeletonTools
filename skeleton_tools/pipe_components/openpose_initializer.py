@@ -230,6 +230,8 @@ class OpenposeInitializer:
             'img_shape': json_file['resolution'],
             'original_shape': json_file['resolution'],
             'fps': json_file['fps'],
+            'length_seconds': json_file['length_seconds'],
+            'total_frames_cv2': json_file['frame_count'],
             'adjust': json_file['adjust'],
             'total_frames': len(json_file['data']),
         }
