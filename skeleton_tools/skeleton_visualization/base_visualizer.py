@@ -19,7 +19,7 @@ class BaseVisualizer(ABC):
         self.blur_face = blur_face
         self.show_confidence = show_confidence
 
-    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, resolution=None, pids=None, child_id=None, child_box=None, detection_conf=None):
+    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, thickness=5, resolution=None, pids=None, child_id=None, child_box=None, detection_conf=None):
         img = np.copy(frame)
 
         if pids is None:
@@ -46,7 +46,7 @@ class BaseVisualizer(ABC):
             if img.shape[-1] > 3:
                 color += (255,)
 
-            img = self.draw_skeleton(img, pose, score, edge_color=color, epsilon=epsilon)
+            img = self.draw_skeleton(img, pose, score, thickness=thickness, edge_color=color, epsilon=epsilon)
 
             if self.display_pid:
                 self.draw_pid(img, pose.T, score, pid, color)
@@ -62,7 +62,7 @@ class BaseVisualizer(ABC):
 
         return img
 
-    def draw_skeleton(self, frame, pose, score, edge_color=None, epsilon=0.05):
+    def draw_skeleton(self, frame, pose, score, edge_color=None, thickness=5, epsilon=0.05):
         img = np.copy(frame)
         if edge_color is None:
             edge_color = (0, 0, 255)
@@ -71,7 +71,7 @@ class BaseVisualizer(ABC):
             joint_color += (255,)
         for (v1, v2) in self.graph_layout.pairs():
             if score[v1] > epsilon and score[v2] > epsilon:
-                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=5, lineType=cv2.LINE_AA)
+                cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=thickness, lineType=cv2.LINE_AA)
         # for i, (x, y) in enumerate(pose):
         #     if score[i] > epsilon:
         #         jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else (joint_color, 2)
