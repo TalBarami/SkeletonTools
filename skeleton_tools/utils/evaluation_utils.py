@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from skeleton_tools.utils.constants import NET_NAME, REMOTE_STORAGE
+from skeleton_tools.utils.constants import NET_NAME, REMOTE_STORAGE, DB_PATH
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -132,13 +132,18 @@ def evaluate(df, ground_truth, min_iou=0.1):
 
     return tp, fp, fn, tn
 
-def evaluate_threshold(scores, human_labels):
+def evaluate_threshold(scores, human_labels, per_assessment=False):
     dfs = [pd.read_csv(p) for p in scores]
-    thresholds = np.round(np.arange(0.4, 1, 0.05), 3)
+    thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
     c, p, r = [], [], []
     for t in thresholds:
         print(f'Threshold: {t}')
         agg = [aggregate(df.copy(), t) for df in dfs]
+        if per_assessment:
+            agg = pd.concat(agg)
+            agg = prepare(agg)
+            agg['video'] = agg['assessment']
+            agg = [g for _, g in agg.groupby('video')]
         tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels) for df in agg])), axis=1)
         precision, recall = tp / (tp + fp), tp / (tp + fn)
         # conf_mat, precision, recall = list(zip(*[evaluate(df, human_labels) for df in agg]))
@@ -146,6 +151,49 @@ def evaluate_threshold(scores, human_labels):
         p.append(np.nanmean(precision))
         r.append(np.nanmean(recall))
     return thresholds, p, r
+
+def aggregate_table(df):
+    df['stereotypical_length'] = (df['end_time'] - df['start_time'])
+    df['stereotypical_relative_length'] = df['stereotypical_length'] / df['length_seconds']
+    table = df.groupby('video').agg({'length_seconds': 'mean', 'stereotypical_length': ['sum', 'mean', 'count'], 'stereotypical_relative_length': ['sum', 'mean']})
+    out = pd.DataFrame(columns=['video', 'length_seconds', 'count_stereotypical', 'sum_stereotypical_length', 'mean_stereotypical_length', 'sum_stereotypical_relative_length', 'mean_stereotypical_relative_length'])
+    out['video'] = table.index
+    out['length_seconds'] = table['length_seconds']['mean'].values
+    out[['sum_stereotypical_length', 'mean_stereotypical_length', 'count_stereotypical']] = table['stereotypical_length'].values
+    out[['sum_stereotypical_relative_length', 'mean_stereotypical_relative_length']] = table['stereotypical_relative_length'].values
+    return out
+
+def aggregate_cameras(annotations):
+    def agg(dfs):
+        result = pd.DataFrame(columns=dfs[0].columns)
+        for df in dfs:
+            df = df[df['movement'] != 'NoAction']
+            for i, row in df.iterrows():
+                if any(get_intersection((row['start_frame'], row['end_frame']), (r['start_frame'], r['end_frame'])) for _, r in result.iterrows()):
+                    continue
+                result.loc[result.shape[0]] = row
+        return result
+    groups = list(annotations.groupby('assessment'))
+    result = []
+    for assessment, group in groups:
+        result.append(agg([vdf for _, vdf in group.groupby('video')]))
+    result = pd.concat(result).sort_values(by=['assessment', 'start_time'])
+    result['video'] = result['assessment']
+    return result
+
+def intersect(*lst):
+    names = [set(df['video'].unique()) for df in lst]
+    names = set.intersection(*names)
+    out = [df[df['video'].isin(names)] for df in lst]
+    return out
+
+def prepare(df, remove_noact=False):
+    if remove_noact:
+        df = df[df['movement'] != 'NoAction']
+    db = pd.read_csv(DB_PATH)
+    df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
+    df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
+    return df
 
 if __name__ == '__main__':
     root = osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3')

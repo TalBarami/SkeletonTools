@@ -82,7 +82,7 @@ class OpenposeInitializer:
                 'fps': fps,
                 'frame_count': frame_count,
                 'length_seconds': length,
-                'adjust': frame_count - len(data),
+                'adjust': int(frame_count - len(data)),
                 'data': data
             }
             if result_skeleton_dir:
