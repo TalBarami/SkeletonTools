@@ -97,17 +97,18 @@ def iou_1d(interval1, interval2):
     iou = (intersection[1] - intersection[0]) / (union[1] - union[0])
     return iou
 
-def evaluate(df, ground_truth, min_iou=0.1):
+def evaluate(df, ground_truth, min_iou=0.1, key='frame'):
     df = df.copy()
     df['movement'] = df['movement'].apply(lambda s: 0 if 'NoAction' in s else 1)
-    df['segment_length'] = df['end_frame'] - df['start_frame']
-    model = df[df['annotator'] == NET_NAME]
+    df['segment_length'] = df[f'end_{key}'] - df[f'start_{key}']
+    # model = df[df['annotator'] == NET_NAME]
+    model = df
     model['hit_score'] = 0
     model['miss_score'] = 0
-    human_intervals = ground_truth[ground_truth['video'] == df['video'].values[0]][['start_frame', 'end_frame']].values.tolist()
+    human_intervals = ground_truth[ground_truth['video'] == df['video'].values[0]][[f'start_{key}', f'end_{key}']].values.tolist()
 
     for i, row in model.iterrows():
-        model_interval = row[['start_frame', 'end_frame']].values.tolist()
+        model_interval = row[[f'start_{key}', f'end_{key}']].values.tolist()
         movement = row['movement']
         ious = [x for x in (iou_1d(model_interval, human_interval) for human_interval in human_intervals) if x is not None]
         if movement == 1:
@@ -121,7 +122,7 @@ def evaluate(df, ground_truth, min_iou=0.1):
             hit = row['segment_length'] - miss
         model.loc[i, ['hit_score', 'miss_score']] = hit, miss
 
-    total_length = model['end_frame'].max()
+    total_length = model[f'end_{key}'].max()
     tp = model[model['movement'] == 1]['hit_score'].sum()
     fp = model[model['movement'] == 1]['miss_score'].sum()
     fn = model[model['movement'] == 0]['miss_score'].sum()
@@ -132,8 +133,8 @@ def evaluate(df, ground_truth, min_iou=0.1):
 
     return tp, fp, fn, tn
 
-def evaluate_threshold(scores, human_labels, per_assessment=False):
-    dfs = [pd.read_csv(p) for p in scores]
+def evaluate_threshold(score_files, human_labels, per_assessment=False):
+    dfs = [pd.read_csv(p) for p in score_files]
     thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
     c, p, r = [], [], []
     for t in thresholds:
@@ -142,9 +143,8 @@ def evaluate_threshold(scores, human_labels, per_assessment=False):
         if per_assessment:
             agg = pd.concat(agg)
             agg = prepare(agg)
-            agg['video'] = agg['assessment']
-            agg = [g for _, g in agg.groupby('video')]
-        tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels) for df in agg])), axis=1)
+            agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
+        tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels, key='time') for df in agg])), axis=1)
         precision, recall = tp / (tp + fp), tp / (tp + fn)
         # conf_mat, precision, recall = list(zip(*[evaluate(df, human_labels) for df in agg]))
         # c.append(np.nanmean(conf_mat, axis=0))
@@ -163,20 +163,38 @@ def aggregate_table(df):
     out[['sum_stereotypical_relative_length', 'mean_stereotypical_relative_length']] = table['stereotypical_relative_length'].values
     return out
 
-def aggregate_cameras(annotations):
-    def agg(dfs):
-        result = pd.DataFrame(columns=dfs[0].columns)
-        for df in dfs:
-            df = df[df['movement'] != 'NoAction']
-            for i, row in df.iterrows():
-                if any(get_intersection((row['start_frame'], row['end_frame']), (r['start_frame'], r['end_frame'])) for _, r in result.iterrows()):
-                    continue
-                result.loc[result.shape[0]] = row
-        return result
+def aggregate_cameras(df, fillna=False):
+    length = df['end_time'].max()
+    dfs = [g for _, g in df.groupby('video')]
+    out = pd.DataFrame(columns = ['assessment', 'start_time', 'end_time', 'movement'])
+    for df in dfs:
+        df = df[df['movement'] != 'NoAction']
+        for i, row in df.iterrows():
+            intersection = [j for j, r in out.iterrows() if get_intersection((row['start_time'], row['end_time']), (r['start_time'], r['end_time'])) is not None]
+            if len(intersection) > 0:
+                _df = pd.DataFrame([row] + [out.loc[j] for j in intersection])
+                row[['start_time', 'end_time']] = (_df['start_time'].min(), _df['end_time'].max())
+                out = out.drop(intersection).reset_index(drop=True)
+            out.loc[out.shape[0]] = row[out.columns]
+    out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
+    if fillna and not out.empty:
+        assessment = out.loc[0]['assessment']
+        n = out.shape[0]
+        s = 0
+        for i in range(n):
+            curr_row = out.loc[i]
+            out.loc[out.shape[0]] = (assessment, s, curr_row['start_time'], 'NoAction')
+            s = curr_row['end_time']
+        out.loc[out.shape[0]] = (assessment, s, length, 'NoAction')
+    out['video'] = out['assessment']
+    out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
+    return out
+
+def aggregate_cameras_for_annotations(annotations, fillna=False):
     groups = list(annotations.groupby('assessment'))
     result = []
     for assessment, group in groups:
-        result.append(agg([vdf for _, vdf in group.groupby('video')]))
+        result.append(aggregate_cameras(group, fillna=fillna))
     result = pd.concat(result).sort_values(by=['assessment', 'start_time'])
     result['video'] = result['assessment']
     return result

@@ -14,11 +14,28 @@ import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
-def init_logger(log_name='log.txt', log_path=r'resources\logs'):
-    logging.basicConfig(filename=osp.join(log_path, log_name), level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s',
-                        datefmt='%d/%m/%Y %H:%M:%S')
-    logging.getLogger().addHandler(logging.StreamHandler())
-    logging.info('Initialization Success')
+def init_logger(log_name, log_path=r'resources\logs'):
+    logger = logging.getLogger(log_name)
+    logger.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    fh = logging.FileHandler(osp.join(log_path, f'{log_name}.log'))
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.DEBUG)
+    sh.setFormatter(formatter)
+
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+
+    # logging.basicConfig(filename=osp.join(log_path, log_name), level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s',
+    #                     datefmt='%d/%m/%Y %H:%M:%S')
+    # logging.getLogger().addHandler(logging.StreamHandler())
+    logger.info(f'Initialization Success: {log_name}')
+    return logger
 
 def get_videos(root=osp.join(REMOTE_STORAGE, 'recordings')):
     video_files = {}
