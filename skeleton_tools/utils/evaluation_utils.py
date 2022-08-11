@@ -164,7 +164,7 @@ def aggregate_table(df):
     return out
 
 def aggregate_cameras(df, fillna=False):
-    length = df['end_time'].max()
+    length = df['length_seconds'].max()
     dfs = [g for _, g in df.groupby('video')]
     out = pd.DataFrame(columns = ['assessment', 'start_time', 'end_time', 'movement'])
     for df in dfs:
@@ -186,6 +186,7 @@ def aggregate_cameras(df, fillna=False):
             out.loc[out.shape[0]] = (assessment, s, curr_row['start_time'], 'NoAction')
             s = curr_row['end_time']
         out.loc[out.shape[0]] = (assessment, s, length, 'NoAction')
+    out['length_seconds'] = length
     out['video'] = out['assessment']
     out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
     return out

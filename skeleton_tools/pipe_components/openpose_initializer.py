@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT, COCO_LAYOUT
 from skeleton_tools.openpose_layouts.graph_layout import convert_layout
-from skeleton_tools.pipe_components.yolo_v5_child_detector import ChildDetector
 from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON
 from skeleton_tools.utils.skeleton_utils import normalize_json
 from skeleton_tools.utils.tools import read_json, write_json, get_video_properties, write_pkl
