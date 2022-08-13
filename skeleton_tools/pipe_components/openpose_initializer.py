@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT, COCO_LAYOUT
 from skeleton_tools.openpose_layouts.graph_layout import convert_layout
-from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON
+from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON, OPENPOSE_ROOT
 from skeleton_tools.utils.skeleton_utils import normalize_json
 from skeleton_tools.utils.tools import read_json, write_json, get_video_properties, write_pkl
 
@@ -25,7 +25,7 @@ class SkeletonSource(Enum):
 
 
 class OpenposeInitializer:
-    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path='C:/research/openpose'):
+    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path=OPENPOSE_ROOT):
         self.layout = openpose_layout
         self.C = in_channels
         self.T = length
