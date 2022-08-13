@@ -12,7 +12,7 @@ def draw_bbox(frame, bbox, bcolor=(255, 255, 255)):
     cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=bcolor, thickness=1)
 
 
-def draw_pid(self, frame, pose, c, pid, color):
+def draw_pid(frame, pose, c, pid, color):
     if np.all(c < EPSILON):
         return
     x = pose[0][c > EPSILON]
@@ -22,7 +22,7 @@ def draw_pid(self, frame, pose, c, pid, color):
     cv2.putText(frame, str(pid), (int(x_center), int(y_center)), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2, cv2.LINE_AA)
 
 
-def blur_area(self, frame, c, r):
+def blur_area(frame, c, r):
     c_mask = np.zeros(frame.shape[:2], np.uint8)
     cv2.circle(c_mask, c, r, 1, thickness=-1)
     mask = cv2.bitwise_and(frame, frame, mask=c_mask)
