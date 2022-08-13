@@ -5,11 +5,12 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
+from skeleton_tools.skeleton_visualization.draw_utils import blur_area, draw_pid, draw_bbox
 from skeleton_tools.utils.constants import COLORS, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
 
 
-class BaseVisualizer(ABC):
+class SkeletonVisualizer(ABC):
     def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
         self.graph_layout = graph_layout
         self.display_pid = display_pid
@@ -36,28 +37,28 @@ class BaseVisualizer(ABC):
                 if (pc > 0).any():
                     ps = pose[face_joints][pc > 0]
                     for p in ps:
-                        img = self.blur_area(img, tuple(p), 100)
+                        img = blur_area(img, tuple(p), 100)
 
         for lst_id, (pose, score, pid) in enumerate(zip(skeletons, scores, pids)):
             if child_id is None:
                 color = tuple(reversed(COLORS[(pid % len(COLORS))]['value']))
             else:
-                color = (0, 0, 255) if child_id == lst_id else (255, 0, 0)
+                color = (255, 0, 0) if child_id == lst_id else (0, 0, 255)
             if img.shape[-1] > 3:
                 color += (255,)
 
             img = self.draw_skeleton(img, pose, score, thickness=thickness, edge_color=color, epsilon=epsilon)
 
             if self.display_pid:
-                self.draw_pid(img, pose.T, score, pid, color)
+                draw_pid(img, pose.T, score, pid, color)
 
             if self.display_bbox:
-                self.draw_bbox(img, bounding_box(pose.T, score, epsilon))
+                draw_bbox(img, bounding_box(pose.T, score, epsilon))
 
         if child_box is not None and detection_conf > 0:
             child_box = child_box.astype(int)
             center, r = child_box[:2], child_box[2:4]
-            self.draw_bbox(img, (center, r), bcolor=(0, 0, 255))
+            draw_bbox(img, (center, r), bcolor=(0, 0, 255))
             cv2.putText(img, str(np.round(detection_conf, 3)), (int(center[0] - r[0] // 2), int(center[1] - r[1] // 2)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
         return img
@@ -77,32 +78,6 @@ class BaseVisualizer(ABC):
         #         jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else (joint_color, 2)
         #         cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
         return img
-
-    def draw_bbox(self, frame, bbox, bcolor=(255 ,255, 255)):
-        center, r = bbox
-        r = r // 2
-        if frame.shape[-3] > 3:
-            bcolor += (255,)
-        cv2.rectangle(frame, tuple((center - r).astype(int)), tuple((center + r).astype(int)), color=bcolor, thickness=1)
-
-    def draw_pid(self, frame, pose, c, pid, color):
-        if np.all(c < EPSILON):
-            return
-        x = pose[0][c > EPSILON]
-        y = pose[1][c > EPSILON]
-        x_center = x.mean() * 0.975
-        y_center = y.min() * 0.9
-        cv2.putText(frame, str(pid), (int(x_center), int(y_center)), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2, cv2.LINE_AA)
-
-    def blur_area(self, frame, c, r):
-        c_mask = np.zeros(frame.shape[:2], np.uint8)
-        cv2.circle(c_mask, c, r, 1, thickness=-1)
-        mask = cv2.bitwise_and(frame, frame, mask=c_mask)
-        img_mask = frame - mask
-        blur = cv2.blur(frame, (50, 50))
-        mask2 = cv2.bitwise_and(blur, blur, mask=c_mask)  # mask
-        final_img = img_mask + mask2
-        return final_img
 
     def create_skeleton_video(self, skeleton_json, out_path):
         fps, length, (width, height), kp, c, pids = self.get_video_info(None, skeleton_json)

@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from skeleton_tools.skeleton_visualization.base_visualizer import BaseVisualizer
+from skeleton_tools.skeleton_visualization.skeleton_visualizer import SkeletonVisualizer
 
 
-class MMPoseVisualizer(BaseVisualizer):
+class MMPoseVisualizer(SkeletonVisualizer):
     def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
         super().__init__(graph_layout, display_pid, display_bbox, denormalize, decentralize, blur_face, show_confidence)
 

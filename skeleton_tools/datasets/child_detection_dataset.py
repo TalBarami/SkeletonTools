@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
-from skeleton_tools.skeleton_visualization.base_visualizer import BaseVisualizer
+from skeleton_tools.skeleton_visualization.skeleton_visualizer import SkeletonVisualizer
 from skeleton_tools.skeleton_visualization.json_visualizer import JsonVisualizer
 from skeleton_tools.utils.skeleton_utils import bounding_box
 from skeleton_tools.utils.tools import read_json, init_directories, write_json
