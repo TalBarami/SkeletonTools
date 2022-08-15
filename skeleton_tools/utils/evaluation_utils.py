@@ -98,6 +98,8 @@ def iou_1d(interval1, interval2):
     return iou
 
 def evaluate(df, ground_truth, min_iou=0.1, key='frame'):
+    if df.empty:
+        return 0, 0, 0, 0
     df = df.copy()
     df['movement'] = df['movement'].apply(lambda s: 0 if 'NoAction' in s else 1)
     df['segment_length'] = df[f'end_{key}'] - df[f'start_{key}']
@@ -153,6 +155,7 @@ def evaluate_threshold(score_files, human_labels, per_assessment=False):
     return thresholds, p, r
 
 def aggregate_table(df):
+    df = df[df['movement'] != 'NoAction']
     df['stereotypical_length'] = (df['end_time'] - df['start_time'])
     df['stereotypical_relative_length'] = df['stereotypical_length'] / df['length_seconds']
     table = df.groupby('video').agg({'length_seconds': 'mean', 'stereotypical_length': ['sum', 'mean', 'count'], 'stereotypical_relative_length': ['sum', 'mean']})

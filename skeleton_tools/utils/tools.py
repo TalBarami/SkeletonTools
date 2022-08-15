@@ -101,8 +101,8 @@ def get_video_properties(filename):
 
         resolution = resolution_candidates[0] if len(resolution_candidates) > 0 else None
         fps = eval(fps_candidates[0]) if len(fps_candidates) > 0 else None
-        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else None
-        frame_count = length * fps if length and fps else None
+        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else length * fps if length and fps else None
+        frame_count = np.ceil(length * fps) if length and fps else None
         return resolution, fps, frame_count, length
     except Exception as e:
         return None, None, None, None
