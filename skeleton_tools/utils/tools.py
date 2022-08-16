@@ -90,8 +90,14 @@ def take_subclip(video_path, start_time, end_time, fps, out_path):
         .run()
 
 
-def get_video_properties(filename):
-    try:
+def get_video_properties(filename, method='ffmpeg'):
+    if method == 'cv2':
+        cap = cv2.VideoCapture(filename)
+        resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        fps = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        length = frame_count * fps
+    else:
         vinf = ffmpeg.probe(filename)
 
         resolution_candidates = [(vinf['streams'][i]['width'], vinf['streams'][i]['height']) for i in range(len(vinf['streams'])) if 'width' in vinf['streams'][i].keys() and 'height' in vinf['streams'][i].keys()]
@@ -101,11 +107,10 @@ def get_video_properties(filename):
 
         resolution = resolution_candidates[0] if len(resolution_candidates) > 0 else None
         fps = eval(fps_candidates[0]) if len(fps_candidates) > 0 else None
-        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else length * fps if length and fps else None
-        frame_count = np.ceil(length * fps) if length and fps else None
-        return resolution, fps, frame_count, length
-    except Exception as e:
-        return None, None, None, None
+        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else None
+        frame_candidates = [eval(vinf['streams'][i]['nb_frames']) for i in range(len(vinf['streams'])) if 'nb_frames' in vinf['streams'][i].keys()]
+        frame_count = int(np.max(frame_candidates)) if len(frame_candidates) > 0 else int(np.ceil(length * fps)) if length and fps else None
+    return resolution, fps, frame_count, length
 
 
 def generate_label_json(skeletons_dir):

@@ -72,17 +72,18 @@ class OpenposeInitializer:
         openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
 
         try:
-            resolution, fps, frame_count, length = get_video_properties(src_path)
+            resolution, fps, frame_count, length = get_video_properties(src_path, method='cv2')
             self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
             skeleton = {
                 'name': basename,
+                'video_path': src_path,
                 'resolution': resolution,
                 'fps': fps,
                 'frame_count': frame_count,
                 'length_seconds': length,
                 'adjust': int(frame_count - len(data)),
-                'data': data
+                'data': data,
             }
             if result_skeleton_dir:
                 result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
@@ -222,15 +223,17 @@ class OpenposeInitializer:
 
     def to_poseC3D(self, json_file, label=None, label_index=None, in_layout=BODY_25_LAYOUT, out_layout=COCO_LAYOUT):
         kp, s = self._to_posec3d_numpy(json_file['data'], in_layout, out_layout)
+
         result = {
             'keypoint': kp,
             'keypoint_score': s,
             'frame_dir': json_file['name'],
+            'video_path': json_file['video_path'],
             'img_shape': json_file['resolution'],
             'original_shape': json_file['resolution'],
             'fps': json_file['fps'],
             'length_seconds': json_file['length_seconds'],
-            'total_frames_cv2': json_file['frame_count'],
+            'frame_count': json_file['frame_count'],
             'adjust': json_file['adjust'],
             'total_frames': len(json_file['data']),
         }
