@@ -8,12 +8,21 @@ from os import path as osp
 from pathlib import Path
 
 import ffmpeg
+from omegaconf import OmegaConf
 import pandas as pd
 import numpy as np
 import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
+def create_config(dict_conf, out=None):
+    for k, v in dict_conf.items():
+        if type(v) == str and ('path' in k or 'dir' in k):
+            dict_conf[k] = v.replace('\\', '/')
+    config = OmegaConf.create(dict_conf)
+    with open(out, 'w') as fp:
+        OmegaConf.save(config=config, f=fp.name)
+    return config
 def init_logger(log_name, log_path=r'resources\logs'):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
