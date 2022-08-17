@@ -175,7 +175,7 @@ def aggregate_b(df): # TODO: Decide if using
         _df.loc[_df.shape[0]] = [df['video'].loc[0], -1, -1, i, i + 30, -1, pd.to_datetime('now'), 'JORDI', sdf['stereotypical_score'].mean()]
     return _df
 
-def draw_confidence_for_assessment(root, files, human_labels_path=r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\human_labels.csv', show=False):
+def draw_confidence_for_assessment(root, files, human_labels_path, show=False):
     init_directories(osp.join(root, 'figs'))
     assessment = ' '.join(files[0].split('_')[:-2])
     fig, axs = plt.subplots(len(files), figsize=(100, 20))
