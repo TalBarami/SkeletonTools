@@ -13,6 +13,8 @@ class GraphLayout:
             self._pose_map[k] = v
             self._pose_map[v] = k
 
+    def face_joints(self):
+        return [k for k in self._pose_map.keys() if type(k) == str and any(s in k for s in ['Eye', 'Ear', 'Nose'])]
     def __len__(self):
         return self._len
 

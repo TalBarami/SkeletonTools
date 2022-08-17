@@ -32,12 +32,9 @@ class SkeletonVisualizer(ABC):
 
         if self.blur_face:
             for i, (pose, score) in enumerate(zip(skeletons, scores)):
-                face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in ['Eye', 'Ear', 'Nose']])]
-                pc = score[face_joints]
-                if (pc > 0).any():
-                    ps = pose[face_joints][pc > 0]
-                    for p in ps:
-                        img = blur_area(img, tuple(p), 100)
+                face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in self.graph_layout.face_joints()])]
+                facebox = bounding_box(pose[face_joints].T, score[face_joints]).astype(int)
+                img = blur_area(img, facebox[:2], facebox[2:].max())
 
         for lst_id, (pose, score, pid) in enumerate(zip(skeletons, scores, pids)):
             if child_id is None:

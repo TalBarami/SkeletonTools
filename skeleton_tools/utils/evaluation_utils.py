@@ -97,38 +97,34 @@ def iou_1d(interval1, interval2):
     iou = (intersection[1] - intersection[0]) / (union[1] - union[0])
     return iou
 
-def evaluate(df, ground_truth, min_iou=0.1, key='frame'):
+def evaluate(df, ground_truth, key='frame'):
     if df.empty:
         return 0, 0, 0, 0
     df = df.copy()
     df['movement'] = df['movement'].apply(lambda s: 0 if 'NoAction' in s else 1)
     df['segment_length'] = df[f'end_{key}'] - df[f'start_{key}']
-    # model = df[df['annotator'] == NET_NAME]
-    model = df
-    model['hit_score'] = 0
-    model['miss_score'] = 0
+    df['hit_score'] = 0
+    df['miss_score'] = 0
     human_intervals = ground_truth[ground_truth['video'] == df['video'].values[0]][[f'start_{key}', f'end_{key}']].values.tolist()
 
-    for i, row in model.iterrows():
+    for i, row in df.iterrows():
         model_interval = row[[f'start_{key}', f'end_{key}']].values.tolist()
-        movement = row['movement']
-        ious = [x for x in (iou_1d(model_interval, human_interval) for human_interval in human_intervals) if x is not None]
-        if movement == 1:
+        intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
+        if row['movement'] == 1:
             miss, hit = row['segment_length'], 0
-            if len(ious) > 0 and any(iou > min_iou for iou in ious):
+            if len(intersections) > 0 and any(intersection > 0 for intersection, _ in intersection):
                 hit, miss = miss, hit
         else:
-            intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
             intersections = [intersect for intersect, interval in intersections if intersect == interval]
             miss = np.sum([high - low for (low, high) in intersections])
             hit = row['segment_length'] - miss
-        model.loc[i, ['hit_score', 'miss_score']] = hit, miss
+        df.loc[i, ['hit_score', 'miss_score']] = hit, miss
 
-    total_length = model[f'end_{key}'].max()
-    tp = model[model['movement'] == 1]['hit_score'].sum()
-    fp = model[model['movement'] == 1]['miss_score'].sum()
-    fn = model[model['movement'] == 0]['miss_score'].sum()
-    tn = model[model['movement'] == 0]['hit_score'].sum()
+    total_length = df[f'end_{key}'].max()
+    tp = df[df['movement'] == 1]['hit_score'].sum()
+    fp = df[df['movement'] == 1]['miss_score'].sum()
+    fn = df[df['movement'] == 0]['miss_score'].sum()
+    tn = df[df['movement'] == 0]['hit_score'].sum()
 
     # conf_mat = np.array([[tp, fp], [fn, tn]]) / total_length
     # precision, recall = tp / (tp + fp), tp / (tp + fn)
@@ -216,28 +212,3 @@ def prepare(df, remove_noact=False):
     df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
     return df
-
-if __name__ == '__main__':
-    root = osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3')
-    human_labels1 = pd.read_csv(osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_labels.csv'))
-    human_labels2 = pd.read_csv(osp.join(REMOTE_STORAGE, r'Users\TalBarami\JORDI_50_vids_benchmark\annotations\labels_post_qa.csv'))
-    names = human_labels2['video'].apply(lambda v: osp.splitext(v)[0]).unique()
-    human_labels1 = human_labels1[human_labels1['video'].apply(lambda v: osp.splitext(v)[0]).isin(names)]
-    files = [x for x in (osp.join(root, f, 'binary_weighted_extra_noact_epoch_18.pth', f'{f}_scores.csv') for f in os.listdir(root) if f in names) if osp.exists(x)]
-    t1, p1, r1 = evaluate_threshold(files, human_labels1)
-    t2, p2, r2 = evaluate_threshold(files, human_labels2)
-    df1 = pd.DataFrame(columns=['threshold', 'precision', 'recall'], data=np.array([t1, p1, r1]).T)
-    df1['annotations'] = 'Old'
-    df2 = pd.DataFrame(columns=['threshold', 'precision', 'recall'], data=np.array([t2, p2, r2]).T)
-    df2['annotations'] = 'New'
-    df = pd.concat((df1, df2)).reset_index(drop=True)
-    fig, ax = plt.subplots()
-    sns.lineplot(data=df, x='recall', y='precision', marker='o', hue='annotations')
-    for _, row in df.iterrows():
-        ax.text(x=row['recall'] + 0.005, y=row['precision'] + 0.005, s=row['threshold'],
-                bbox=dict(facecolor='lightblue', alpha=0.5))
-    ax.set_title('Precision-Recall Curve')
-    ax.set_ylabel('Precision')
-    ax.set_xlabel('Recall')
-    plt.show()
-

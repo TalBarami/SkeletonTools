@@ -20,9 +20,10 @@ def create_config(dict_conf, out=None):
         if type(v) == str and ('path' in k or 'dir' in k):
             dict_conf[k] = v.replace('\\', '/')
     config = OmegaConf.create(dict_conf)
-    with open(out, 'w') as fp:
+    with open(out.replace('\\', '/'), 'w') as fp:
         OmegaConf.save(config=config, f=fp.name)
     return config
+
 def init_logger(log_name, log_path=r'resources\logs'):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
