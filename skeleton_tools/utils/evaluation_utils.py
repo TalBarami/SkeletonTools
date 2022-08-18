@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from skeleton_tools.utils.constants import NET_NAME, REMOTE_STORAGE, DB_PATH
+from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -110,44 +111,49 @@ def evaluate(df, ground_truth, key='frame'):
     for i, row in df.iterrows():
         model_interval = row[[f'start_{key}', f'end_{key}']].values.tolist()
         intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
+        slength = row['segment_length']
         if row['movement'] == 1:
-            miss, hit = row['segment_length'], 0
-            if len(intersections) > 0 and any(intersection > 0 for intersection, _ in intersection):
-                hit, miss = miss, hit
+            hit, miss = (slength, 0) if len(intersections) > 0 else (0, slength)
         else:
             intersections = [intersect for intersect, interval in intersections if intersect == interval]
             miss = np.sum([high - low for (low, high) in intersections])
-            hit = row['segment_length'] - miss
+            hit = slength - miss
         df.loc[i, ['hit_score', 'miss_score']] = hit, miss
 
-    total_length = df[f'end_{key}'].max()
     tp = df[df['movement'] == 1]['hit_score'].sum()
     fp = df[df['movement'] == 1]['miss_score'].sum()
     fn = df[df['movement'] == 0]['miss_score'].sum()
     tn = df[df['movement'] == 0]['hit_score'].sum()
 
-    # conf_mat = np.array([[tp, fp], [fn, tn]]) / total_length
-    # precision, recall = tp / (tp + fp), tp / (tp + fn)
-
+    # print(f'{df.iloc[0]["video"]}: {tp} {fp} {tn} {fn}')
     return tp, fp, fn, tn
 
-def evaluate_threshold(score_files, human_labels, per_assessment=False):
-    dfs = [pd.read_csv(p) for p in score_files]
+def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
+    init_directories(out_path)
+    dfs = pd.concat([pd.read_csv(p) for p in score_files])
     thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
     c, p, r = [], [], []
     for t in thresholds:
         print(f'Threshold: {t}')
-        agg = [aggregate(df.copy(), t) for df in dfs]
+        out_file = osp.join(out_path, f'predictions_{t}.csv')
+        if osp.exists(out_file):
+            agg = pd.read_csv(out_file)
+        else:
+            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')]) # TODO: Maybe write this to file
+            agg.to_csv(out_file, index=False)
+        n, m = agg['video'].nunique(), agg['assessment'].nunique()
         if per_assessment:
-            agg = pd.concat(agg)
-            agg = prepare(agg)
-            agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
+            agg = [aggregate_cameras(g, fillna=True, drop_adjustments=True) for _, g in agg.groupby('assessment')]
+        else:
+            agg = [df for _, df in agg.groupby('video')]
         tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels, key='time') for df in agg])), axis=1)
-        precision, recall = tp / (tp + fp), tp / (tp + fn)
-        # conf_mat, precision, recall = list(zip(*[evaluate(df, human_labels) for df in agg]))
-        # c.append(np.nanmean(conf_mat, axis=0))
-        p.append(np.nanmean(precision))
-        r.append(np.nanmean(recall))
+        if tp == 0:
+            precision, recall = 0, 0
+        else:
+            precision, recall = tp / (tp + fp), tp / (tp + fn)
+        print(f'\tPrecision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
+        p.append(precision)
+        r.append(recall)
     return thresholds, p, r
 
 def aggregate_table(df):
@@ -162,9 +168,28 @@ def aggregate_table(df):
     out[['sum_stereotypical_relative_length', 'mean_stereotypical_relative_length']] = table['stereotypical_relative_length'].values
     return out
 
-def aggregate_cameras(df, fillna=False):
+
+adjustments = read_json(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') if osp.exists(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') else {}
+def get_adjust(name):
+    if name in adjustments.keys():
+        return adjustments[name]
+    else:
+        basename = osp.splitext(name)[0]
+        skel_path = osp.join(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv3', basename, f'{basename}.pkl')
+        if osp.exists(skel_path):
+            T = read_pkl(skel_path)['keypoint'].shape[1]
+            _, _, L, _ = get_video_properties(osp.join(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\videos', name.split('_')[0], name), method='cv2')
+            adj = L - T
+            adjustments[name] = adj
+            write_json(adjustments, r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json')
+            return adj
+        else:
+            print(f'No skeleton for {name}')
+            return None
+
+def aggregate_cameras(df, fillna=False, drop_adjustments=False):
     length = df['length_seconds'].max()
-    dfs = [g for _, g in df.groupby('video')]
+    dfs = [g for v, g in df.groupby('video') if not drop_adjustments or (np.abs(get_adjust(v)) <= 5)]
     out = pd.DataFrame(columns = ['assessment', 'start_time', 'end_time', 'movement'])
     for df in dfs:
         df = df[df['movement'] != 'NoAction']
@@ -190,11 +215,11 @@ def aggregate_cameras(df, fillna=False):
     out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
     return out
 
-def aggregate_cameras_for_annotations(annotations, fillna=False):
+def aggregate_cameras_for_annotations(annotations, fillna=False, drop_adjustments=False):
     groups = list(annotations.groupby('assessment'))
     result = []
     for assessment, group in groups:
-        result.append(aggregate_cameras(group, fillna=fillna))
+        result.append(aggregate_cameras(group, fillna=fillna, drop_adjustments=drop_adjustments))
     result = pd.concat(result).sort_values(by=['assessment', 'start_time'])
     result['video'] = result['assessment']
     return result

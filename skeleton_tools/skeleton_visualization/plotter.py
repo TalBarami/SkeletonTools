@@ -191,8 +191,8 @@ def draw_confidence_for_assessment(root, files, human_labels_path, show=False):
     for ax, file in zip(axs, files):
         camid = file.split('_')[-1][0]
         name = osp.splitext(file)[0]
-        jordi, agg = pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_scores.csv')), \
-                     pd.read_csv(osp.join(root, name, 'binary_weighted_extra_noact_epoch_18.pth', f'{name}_annotations.csv'))
+        jordi, agg = pd.read_csv(osp.join(root, name, 'jordi', f'{name}_scores.csv')), \
+                     pd.read_csv(osp.join(root, name, 'jordi', f'{name}_annotations.csv'))
         agg = agg[(agg['movement'] == 1) | (agg['movement'] == 'Stereotypical')]
         draw_net_confidence(ax,
                             jordi,

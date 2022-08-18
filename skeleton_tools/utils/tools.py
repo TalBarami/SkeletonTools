@@ -104,7 +104,7 @@ def get_video_properties(filename, method='ffmpeg'):
     if method == 'cv2':
         cap = cv2.VideoCapture(filename)
         resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        fps = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        fps = cap.get(cv2.CAP_PROP_FPS)
         frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
         length = frame_count * fps
     else:
