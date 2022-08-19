@@ -24,21 +24,21 @@ def create_config(dict_conf, out=None):
         OmegaConf.save(config=config, f=fp.name)
     return config
 
-def init_logger(log_name, log_path=r'resources\logs'):
+def init_logger(log_name, log_path=None):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    fh = logging.FileHandler(osp.join(log_path, f'{log_name}.log'))
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
+    if log_path is not None:
+        fh = logging.FileHandler(osp.join(log_path, f'{log_name}.log'))
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
 
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     sh.setFormatter(formatter)
-
-    logger.addHandler(fh)
     logger.addHandler(sh)
 
     # logging.basicConfig(filename=osp.join(log_path, log_name), level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s',
@@ -105,8 +105,8 @@ def get_video_properties(filename, method='ffmpeg'):
         cap = cv2.VideoCapture(filename)
         resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        length = frame_count * fps
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        length = frame_count / fps
     else:
         vinf = ffmpeg.probe(filename)
 

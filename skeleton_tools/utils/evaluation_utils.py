@@ -11,6 +11,7 @@ from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_dire
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
 
+
 def unify(df):
     _df = pd.DataFrame(columns=df.columns)
 
@@ -85,10 +86,12 @@ def get_intersection(interval1, interval2):
     new_max = min(interval1[1], interval2[1])
     return [new_min, new_max] if new_min <= new_max else None
 
+
 def get_union(interval1, interval2):
     new_min = min(interval1[0], interval2[0])
     new_max = max(interval1[1], interval2[1])
     return [new_min, new_max] if new_min <= new_max else None
+
 
 def iou_1d(interval1, interval2):
     intersection = get_intersection(interval1, interval2)
@@ -97,6 +100,7 @@ def iou_1d(interval1, interval2):
     union = get_union(interval1, interval2)
     iou = (intersection[1] - intersection[0]) / (union[1] - union[0])
     return iou
+
 
 def evaluate(df, ground_truth, key='frame'):
     if df.empty:
@@ -128,7 +132,8 @@ def evaluate(df, ground_truth, key='frame'):
     # print(f'{df.iloc[0]["video"]}: {tp} {fp} {tn} {fn}')
     return tp, fp, fn, tn
 
-def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
+
+def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False, drop_adjustments=False):
     init_directories(out_path)
     dfs = pd.concat([pd.read_csv(p) for p in score_files])
     thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
@@ -139,11 +144,13 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
         if osp.exists(out_file):
             agg = pd.read_csv(out_file)
         else:
-            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')]) # TODO: Maybe write this to file
+            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
             agg.to_csv(out_file, index=False)
+        if drop_adjustments:
+            agg = agg[agg['video'].apply(lambda v: np.abs(get_adjust(v)) < 1)]
         n, m = agg['video'].nunique(), agg['assessment'].nunique()
         if per_assessment:
-            agg = [aggregate_cameras(g, fillna=True, drop_adjustments=True) for _, g in agg.groupby('assessment')]
+            agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
         else:
             agg = [df for _, df in agg.groupby('video')]
         tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels, key='time') for df in agg])), axis=1)
@@ -155,6 +162,7 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
         p.append(precision)
         r.append(recall)
     return thresholds, p, r
+
 
 def aggregate_table(df):
     df = df[df['movement'] != 'NoAction']
@@ -170,6 +178,8 @@ def aggregate_table(df):
 
 
 adjustments = read_json(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') if osp.exists(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') else {}
+
+
 def get_adjust(name):
     if name in adjustments.keys():
         return adjustments[name]
@@ -187,10 +197,11 @@ def get_adjust(name):
             print(f'No skeleton for {name}')
             return None
 
-def aggregate_cameras(df, fillna=False, drop_adjustments=False):
+
+def aggregate_cameras(df, fillna=False):
     length = df['length_seconds'].max()
-    dfs = [g for v, g in df.groupby('video') if not drop_adjustments or (np.abs(get_adjust(v)) <= 5)]
-    out = pd.DataFrame(columns = ['assessment', 'start_time', 'end_time', 'movement'])
+    dfs = [g for v, g in df.groupby('video')]
+    out = pd.DataFrame(columns=['assessment', 'start_time', 'end_time', 'movement'])
     for df in dfs:
         df = df[df['movement'] != 'NoAction']
         for i, row in df.iterrows():
@@ -215,6 +226,7 @@ def aggregate_cameras(df, fillna=False, drop_adjustments=False):
     out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
     return out
 
+
 def aggregate_cameras_for_annotations(annotations, fillna=False, drop_adjustments=False):
     groups = list(annotations.groupby('assessment'))
     result = []
@@ -224,11 +236,13 @@ def aggregate_cameras_for_annotations(annotations, fillna=False, drop_adjustment
     result['video'] = result['assessment']
     return result
 
+
 def intersect(*lst):
     names = [set(df['video'].unique()) for df in lst]
     names = set.intersection(*names)
     out = [df[df['video'].isin(names)] for df in lst]
     return out
+
 
 def prepare(df, remove_noact=False):
     if remove_noact:

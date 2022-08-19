@@ -4,8 +4,10 @@ import shutil
 import subprocess
 from enum import Enum
 from itertools import chain
-from os import path
+from os import path as osp
 from pathlib import Path
+
+import cv2
 import numpy as np
 from copy import deepcopy
 from PIL import Image
@@ -15,7 +17,7 @@ from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT, COCO_LAYOUT
 from skeleton_tools.openpose_layouts.graph_layout import convert_layout
 from skeleton_tools.utils.constants import LENGTH, JSON_SOURCES, EPSILON, OPENPOSE_ROOT
 from skeleton_tools.utils.skeleton_utils import normalize_json
-from skeleton_tools.utils.tools import read_json, write_json, get_video_properties, write_pkl
+from skeleton_tools.utils.tools import read_json, write_json, get_video_properties, write_pkl, init_directories, init_logger
 
 
 class SkeletonSource(Enum):
@@ -25,7 +27,11 @@ class SkeletonSource(Enum):
 
 
 class OpenposeInitializer:
-    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path=OPENPOSE_ROOT):
+    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path=OPENPOSE_ROOT, as_img_dir=False, logger=None):
+        if logger is None:
+            self.logger = init_logger('OpenPoseInitializer')
+        else:
+            self.logger = logger
         self.layout = openpose_layout
         self.C = in_channels
         self.T = length
@@ -33,9 +39,23 @@ class OpenposeInitializer:
         self.num_person_in = num_person_in
         self.num_person_out = num_person_out
         self.open_pose_path = open_pose_path
+        self.as_img_dir = as_img_dir
 
-    def _exec_openpose(self, src_path, skeleton_dst=None, source_type=SkeletonSource.VIDEO):
-        Path(skeleton_dst).mkdir(parents=True, exist_ok=True)
+    def _video2img(self, video_path, out_path):
+        name = osp.splitext(osp.basename(video_path))[0]
+        self.logger.info(f'Converting video to image dir.')
+        init_directories(out_path)
+        cap = cv2.VideoCapture(video_path)
+        n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        d = len(str(n))
+        i, ret = 0, True
+        while ret:
+            ret, frame = cap.read()
+            cv2.imwrite(osp.join(out_path, f'{name}_{str(i).zfill(d)}.jpg'), frame)
+            i += 1
+
+    def _exec_openpose(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO):
+        init_directories(skeleton_dst)
         if src_path.startswith('\\\\'):
             src_path = f'\\{src_path}'
         params = {
@@ -58,23 +78,33 @@ class OpenposeInitializer:
 
         cwd = os.getcwd()
         os.chdir(self.open_pose_path)
-        cmd = f'build_windows/x64/Release/OpenPoseDemo.exe {args}' if path.exists('build_windows') else f'bin/OpenPoseDemo.exe {args}'
-        print(f'Executing: {cmd}')
+        cmd = f'build_windows/x64/Release/OpenPoseDemo.exe {args}' if osp.exists('build_windows') else f'bin/OpenPoseDemo.exe {args}'
+        self.logger.info(f'Executing: {cmd}')
         try:
             subprocess.check_call(shlex.split(cmd), universal_newlines=True)
         finally:
             os.chdir(cwd)
-            print('OpenPose finished.')
+            self.logger.info('OpenPose finished.')
 
     def prepare_skeleton(self, src_path, result_skeleton_dir=None, source_type=SkeletonSource.VIDEO, out_name=None):
-        basename = path.basename(src_path)
-        basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
-        openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
+        basename = osp.basename(src_path)
+        basename_no_ext = osp.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
+
+        process_dir = osp.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else osp.join(result_skeleton_dir, basename_no_ext)
+        openpose_output_path = osp.join(process_dir, 'openpose')
 
         try:
             resolution, fps, frame_count, length = get_video_properties(src_path, method='cv2')
-            self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
+            if self.as_img_dir:
+                img_out_path = osp.join(process_dir, 'img_dirs')
+                self._video2img(src_path, img_out_path)
+                self._exec_openpose(img_out_path, openpose_output_path, source_type=SkeletonSource.IMAGE)
+            else:
+                self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
+            adj = int(frame_count - len(data))
+            if adj != 0:
+                self.logger.warning(f'Skeleton {basename} requires adjustments.')
             skeleton = {
                 'name': basename,
                 'video_path': src_path,
@@ -82,21 +112,21 @@ class OpenposeInitializer:
                 'fps': fps,
                 'frame_count': frame_count,
                 'length_seconds': length,
-                'adjust': int(frame_count - len(data)),
+                'adjust': adj,
                 'data': data,
             }
             if result_skeleton_dir:
-                result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
+                result_path = osp.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
                 write_pkl(skeleton, result_path)
             return skeleton
         except Exception as e:
-            print(f'Error creating skeleton from {src_path}: {e}')
+            self.logger.error(f'Error creating skeleton from {src_path}: {e}')
             raise e
         finally:
-            shutil.rmtree(openpose_output_path)
+            shutil.rmtree(process_dir)
 
     def openpose_to_json(self, openpose_dir):
-        file_names = [path.join(openpose_dir, f) for f in os.listdir(openpose_dir) if path.isfile(path.join(openpose_dir, f)) and f.endswith('json')]
+        file_names = [path.join(openpose_dir, f) for f in os.listdir(openpose_dir) if osp.isfile(path.join(openpose_dir, f)) and f.endswith('json')]
 
         def collect_data(lst):
             k = np.array([float(c) for c in lst])
@@ -129,7 +159,7 @@ class OpenposeInitializer:
     #         c = np.round(k[2::3], 8)
     #         return np.concatenate((x, y), axis=1), c
     #
-    #     file_names = [path.join(openpose_output_path, f) for f in os.listdir(openpose_output_path) if path.isfile(path.join(openpose_output_path, f)) and f.endswith('json')]
+    #     file_names = [path.join(openpose_output_path, f) for f in os.listdir(openpose_output_path) if osp.isfile(path.join(openpose_output_path, f)) and f.endswith('json')]
     #
     #     kps = np.zeros((max_people, len(file_names), len(self.layout), in_channels))
     #     scores = np.zeros((max_people, len(file_names), len(self.layout)))
@@ -143,9 +173,9 @@ class OpenposeInitializer:
     #     return kps, scores
     #
     # def prepare_skeleton_new(self, src_path, result_skeleton_dir=None, source_type=SkeletonSource.VIDEO, out_name=None, label=None, label_index=None):
-    #     basename = path.basename(src_path)
-    #     basename_no_ext = path.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
-    #     openpose_output_path = path.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else path.join(result_skeleton_dir, 'openpose', basename_no_ext)
+    #     basename = osp.basename(src_path)
+    #     basename_no_ext = osp.splitext(basename)[0] if source_type == SkeletonSource.VIDEO else basename
+    #     openpose_output_path = osp.join(self.open_pose_path, 'runs', basename_no_ext) if result_skeleton_dir is None else osp.join(result_skeleton_dir, 'openpose', basename_no_ext)
     #
     #     try:
     #         resolution, fps, frame_count = get_video_properties(src_path)
@@ -164,7 +194,7 @@ class OpenposeInitializer:
     #             skeleton['label_name'] = label
     #             skeleton['label'] = label_index
     #         if result_skeleton_dir:
-    #             result_path = path.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
+    #             result_path = osp.join(result_skeleton_dir, out_name if out_name else f'{basename_no_ext}.json')
     #             write_pkl(skeleton, result_path)
     #         return skeleton
     #     except Exception as e:
