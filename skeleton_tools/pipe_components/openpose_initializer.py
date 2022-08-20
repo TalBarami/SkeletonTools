@@ -126,7 +126,7 @@ class OpenposeInitializer:
             shutil.rmtree(process_dir)
 
     def openpose_to_json(self, openpose_dir):
-        file_names = [path.join(openpose_dir, f) for f in os.listdir(openpose_dir) if osp.isfile(path.join(openpose_dir, f)) and f.endswith('json')]
+        file_names = [osp.join(openpose_dir, f) for f in os.listdir(openpose_dir) if osp.isfile(osp.join(openpose_dir, f)) and f.endswith('json')]
 
         def collect_data(lst):
             k = np.array([float(c) for c in lst])
