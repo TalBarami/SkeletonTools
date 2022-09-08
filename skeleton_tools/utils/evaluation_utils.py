@@ -141,11 +141,11 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
     for t in thresholds:
         print(f'Threshold: {t}')
         out_file = osp.join(out_path, f'predictions_{t}.csv')
-        if osp.exists(out_file):
-            agg = pd.read_csv(out_file)
-        else:
-            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
-            agg.to_csv(out_file, index=False)
+        # if osp.exists(out_file):
+        #     agg = pd.read_csv(out_file)
+        # else:
+        agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
+            # agg.to_csv(out_file, index=False)
         if drop_adjustments:
             agg = agg[agg['video'].apply(lambda v: np.abs(get_adjust(v)) < 1)]
         n, m = agg['video'].nunique(), agg['assessment'].nunique()
@@ -227,11 +227,11 @@ def aggregate_cameras(df, fillna=False):
     return out
 
 
-def aggregate_cameras_for_annotations(annotations, fillna=False, drop_adjustments=False):
+def aggregate_cameras_for_annotations(annotations, fillna=False):
     groups = list(annotations.groupby('assessment'))
     result = []
     for assessment, group in groups:
-        result.append(aggregate_cameras(group, fillna=fillna, drop_adjustments=drop_adjustments))
+        result.append(aggregate_cameras(group, fillna=fillna))
     result = pd.concat(result).sort_values(by=['assessment', 'start_time'])
     result['video'] = result['assessment']
     return result
