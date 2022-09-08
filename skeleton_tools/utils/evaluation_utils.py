@@ -133,35 +133,32 @@ def evaluate(df, ground_truth, key='frame'):
     return tp, fp, fn, tn
 
 
-def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False, drop_adjustments=False):
+def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
     init_directories(out_path)
     dfs = pd.concat([pd.read_csv(p) for p in score_files])
     thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
-    c, p, r = [], [], []
+    a, p, r = [], [], []
     for t in thresholds:
         print(f'Threshold: {t}')
         out_file = osp.join(out_path, f'predictions_{t}.csv')
-        # if osp.exists(out_file):
-        #     agg = pd.read_csv(out_file)
-        # else:
-        agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
-            # agg.to_csv(out_file, index=False)
-        if drop_adjustments:
-            agg = agg[agg['video'].apply(lambda v: np.abs(get_adjust(v)) < 1)]
+        if osp.exists(out_file):
+            agg = pd.read_csv(out_file)
+        else:
+            print(f'Preparing dataframes...')
+            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
+            agg.to_csv(out_file, index=False)
         n, m = agg['video'].nunique(), agg['assessment'].nunique()
         if per_assessment:
             agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
         else:
             agg = [df for _, df in agg.groupby('video')]
         tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels, key='time') for df in agg])), axis=1)
-        if tp == 0:
-            precision, recall = 0, 0
-        else:
-            precision, recall = tp / (tp + fp), tp / (tp + fn)
-        print(f'\tPrecision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
+        accuracy, precision, recall = (tp + tn) / (tp + tn + fp + fn), tp / (tp + fp), tp / (tp + fn)
+        print(f'\tAccuracy={accuracy}, Precision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
+        a.append(accuracy)
         p.append(precision)
         r.append(recall)
-    return thresholds, p, r
+    return thresholds, a, p, r
 
 
 def aggregate_table(df):
