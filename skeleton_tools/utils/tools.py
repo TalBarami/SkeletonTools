@@ -194,8 +194,8 @@ def combine_meta_data(face_dir, hand_dir, combined_dir):
             face['people'][i]['hand_right_keypoints_2d'] = hand['people'][i]['hand_right_keypoints_2d']
         write_json(face, osp.join(combined_dir, name))
 
-def collect_labels(root, model_name, out=None):
-    files = [osp.join(root, f, 'jordi', model_name, f'{f}_annotations.csv') for f in os.listdir(root)]
+def collect_labels(root, model_name, file_extension='annotations', out=None):
+    files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in os.listdir(root)]
     dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
     df = pd.concat(dfs)
     df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
