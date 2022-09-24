@@ -136,7 +136,7 @@ def evaluate(df, ground_truth, key='frame'):
 def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
     init_directories(out_path)
     dfs = pd.concat([pd.read_csv(p) for p in score_files])
-    thresholds = np.round(np.arange(0.05, 1, 0.05), 3)
+    thresholds = np.round(np.arange(0.35, 1, 0.05), 3)
     a, p, r = [], [], []
     for t in thresholds:
         print(f'Threshold: {t}')
@@ -234,10 +234,12 @@ def aggregate_cameras_for_annotations(annotations, fillna=False):
     return result
 
 
-def intersect(*lst):
-    names = [set(df['video'].unique()) for df in lst]
+def intersect(*lst, on='assessment', exclude=None):
+    names = [set(df[on].unique()) for df in lst]
     names = set.intersection(*names)
-    out = [df[df['video'].isin(names)] for df in lst]
+    out = [df[df[on].isin(names)] for df in lst]
+    if exclude is not None:
+        out = [df[~df['assessment'].isin(exclude)] for df in out]
     return out
 
 

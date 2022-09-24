@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 from os import path as osp
+from pathlib import Path
+
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -11,14 +13,14 @@ from skeleton_tools.utils.skeleton_utils import bounding_box
 
 
 class SkeletonVisualizer(ABC):
-    def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
+    def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, display_child_bbox=False):
         self.graph_layout = graph_layout
         self.display_pid = display_pid
         self.display_bbox = display_bbox
         self.denormalize = int(denormalize)
         self.decentralize = decentralize
         self.blur_face = blur_face
-        self.show_confidence = show_confidence
+        self.display_child_bbox = display_child_bbox
 
     def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, thickness=5, resolution=None, pids=None, child_id=None, child_box=None, detection_conf=None):
         img = np.copy(frame)
@@ -40,7 +42,7 @@ class SkeletonVisualizer(ABC):
             if child_id is None:
                 color = tuple(reversed(COLORS[(pid % len(COLORS))]['value']))
             else:
-                color = (255, 0, 0) if child_id == lst_id else (0, 0, 255)
+                color = (0, 0, 255) if child_id == lst_id else (255, 0, 0)
             if img.shape[-1] > 3:
                 color += (255,)
 
@@ -52,7 +54,7 @@ class SkeletonVisualizer(ABC):
             if self.display_bbox:
                 draw_bbox(img, bounding_box(pose.T, score, epsilon))
 
-        if child_box is not None and detection_conf > 0:
+        if self.display_child_bbox and child_box is not None and detection_conf > 0:
             child_box = child_box.astype(int)
             center, r = child_box[:2], child_box[2:4]
             draw_bbox(img, (center, r), bcolor=(0, 0, 255))
@@ -88,9 +90,9 @@ class SkeletonVisualizer(ABC):
         out.release()
 
     def create_double_frame_video(self, video_path, skeleton_data, out_path, start=None, end=None):
-        fps, frames_count, (width, height), kp, c, pids = self.get_video_info(video_path, skeleton_data)
+        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton_data)
         start = int(0 if start is None else start * fps)
-        end = int(frames_count if end is None else end * fps)
+        end = int(length if end is None else end * fps)
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(out_path, fourcc, fps, (2 * width, height))
@@ -99,7 +101,9 @@ class SkeletonVisualizer(ABC):
         for i in tqdm(range(start, end), desc="Writing video result"):
             ret, frame = cap.read()
             skel_frame = np.zeros_like(frame)
-            if i < len(kp):
+            if child_ids is not None:
+                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
+            else:
                 skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
             out.write(np.concatenate((frame, skel_frame), axis=1))
         cap.release()
@@ -127,6 +131,20 @@ class SkeletonVisualizer(ABC):
                 break
         cap.release()
         out.release()
+
+    def export_frames(self, video_path, skeleton, out_path):
+        Path(out_path).mkdir(parents=True, exist_ok=True)
+        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton)
+        cap = cv2.VideoCapture(video_path)
+
+        for i in tqdm(range(length), desc="Writing video result"):
+            ret, frame = cap.read()
+            if child_ids is not None:
+                frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
+            else:
+                frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
+            cv2.imwrite(osp.join(out_path, f'{i}.png'), frame)
+        cap.release()
 
     def to_image(self, frame):
         top, bottom, left, right = [20] * 4
