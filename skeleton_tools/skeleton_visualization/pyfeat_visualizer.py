@@ -4,8 +4,8 @@ from skeleton_tools.utils.tools import get_video_properties
 
 
 class PyfeatVisualizer(SkeletonVisualizer):
-    def __init__(self, graph_layout, blur_face):
-        super().__init__(graph_layout, blur_face=blur_face)
+    def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, show_confidence=False):
+        super().__init__(graph_layout, display_pid, display_bbox, denormalize, decentralize, blur_face, show_confidence)
 
     # def draw_facebox(self, frame, faces):
     #     for _, face in faces.iterrows():
