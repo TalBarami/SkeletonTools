@@ -61,44 +61,48 @@ def plot_fft(data_numpy, title, filename):
     # plt.show()
 
 
-def bar_plot_lenghts(df, name):
-    fig, ax = plt.subplots()
+def bar_plot_lenghts(ax, df):
+    # fig, ax = plt.subplots()
     df['length'] = df['end_time'] - df['start_time'] - 2
     nactions = df.groupby('movement')['video'].count().sort_values()
     classes = nactions.index
     lengths = [df[df['movement'] == c]['length'].to_numpy() for c in classes]
     groups = [(0, 3), (3, 5), (5, 8), (8, np.inf)]
-    cmap = sns.color_palette("mako", as_cmap=True)
+    # cmap = sns.color_palette("mako", as_cmap=True)
     prev = np.zeros(len(classes))
-    n = 255 // len(groups)
+    # n = 255 // len(groups)
+    cmap = ['354F52', '52796F', '84A98C', 'CAD2C5']
+
     for i, (min_len, max_len) in enumerate(groups):
         counts = [np.count_nonzero(l[(min_len < l) & (l <= max_len)]) for l in lengths]
-        ax.barh(classes, counts, color=cmap(i * n), left=prev)
+        # ax.barh(classes, counts, color=cmap(i * n), left=prev)
+        ax.barh(classes, counts, color=f'#{cmap[i]}', left=prev)
         prev += counts
     legend = [f'{min_len}s - {max_len}s' for (min_len, max_len) in groups]
     legend[-1] = f'{groups[-1][0]}s $\leq$'
-    plt.legend(legend, loc='lower right', ncol=2)
-    plt.xlabel('Number of videos')
-    plt.ylabel('Class')
-    plt.savefig(f'resources/figs/{name}_videos_lengths.png', bbox_inches='tight')
-    plt.show()
+    ax.legend(legend, loc='lower right', ncol=2)
+    ax.set_xlabel('Number of videos')
+    ax.set_ylabel('Class')
+    # plt.savefig(f'resources/figs/{name}_videos_lengths.png', bbox_inches='tight')
+    # plt.show()
 
 
-def bar_plot_unique_children(df, name):
-    fig, ax = plt.subplots()
+def bar_plot_unique_children(ax, df):
+    # fig, ax = plt.subplots()
     df['ckey'] = df['video'].apply(lambda s: s.split('_')[0])
     gp = df.groupby(['movement'])['ckey'].nunique().sort_values()
-    ax.barh(gp.index, gp.values / df['ckey'].nunique() * 100)
+    ax.barh(gp.index, gp.values / df['ckey'].nunique() * 100, color='#354F52')
     for p in ax.patches:
         width = p.get_width()
         height = p.get_height()
         x, y = p.get_xy()
         ax.annotate(f'{int(width)}%', (x + width + 4, y + height * 0.25), ha='center')
-    ax.set_xlim(0, 80)
+    ax.set_xlim(0, 100)
+    ax.set_xticks(ticks=np.arange(0, 101, 20), labels=[f'{i}%' for i in np.arange(0, 101, 20)])
     ax.set_xlabel('Percentage of unique children')
-    ax.set_ylabel('Class')
-    plt.savefig(f'resources/figs/{name}_unique_children.png', bbox_inches='tight')
-    plt.show()
+    # ax.set_ylabel('Class')
+    # plt.savefig(f'resources/figs/{name}_unique_children.png', bbox_inches='tight')
+    # plt.show()
 
 # def bar_plot_actions_count_dist(df, name):
 #     fig, ax = plt.subplots()
@@ -110,40 +114,50 @@ def bar_plot_unique_children(df, name):
 #     plt.savefig(f'resources/figs/{name}_actions_count_dist.png', bbox_inches='tight')
 #     plt.show()
 
-def bar_plot_actions_count_dist(dfs, names):
-    fig, ax = plt.subplots()
+def bar_plot_actions_count_dist(ax, dfs, names):
+    colors = [f'#{i}' for i in ['6A4C93', '1982C4', '8AC926', 'FF595E']]
     _dfs = []
     for df, name in zip(dfs, names):
         df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
         gp = df.groupby('assessment')['video'].count()
         _dfs.append(pd.DataFrame(columns=['video', 'actions_count', 'legend'], data=np.array([gp.index, gp.values, [name] * len(gp)]).T))
-    for _df in _dfs:
-        sns.distplot(_df['actions_count'], hist=False, ax=ax)
+    for color, _df in zip(colors, _dfs):
+        sns.distplot(_df['actions_count'], hist=False, ax=ax, color=color) # TODO: kde_kws={'bw':0.25} , check qq plot with ilan
+    for l in ax.lines:
+        x1 = l.get_xydata()[:, 0]
+        y1 = l.get_xydata()[:, 1]
+        c = l.get_color()
+        ax.fill_between(x1, y1, alpha=0.1, color=c)
+    ax.set_xlim(right=200)
     # _df = pd.concat(_dfs).reset_index(drop=True)
     # ax = sns.displot(data=_df, x="actions_count", hue='legend', multiple='stack', kind='kde')
     ax.set(xlabel='Actions count')
-    fig.legend(labels=names, borderaxespad=2)
-    fig.tight_layout()
-    plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
-    plt.show()
+    ax.legend(labels=names, borderaxespad=2)
+    # plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
+    # plt.show()
 
-def bar_plot_actions_length_dist(dfs, names):
-    fig, ax = plt.subplots()
+def bar_plot_actions_length_dist(ax, dfs, names):
+    colors=[f'#{i}' for i in ['6A4C93', '1982C4', '8AC926', 'FF595E']]
     _dfs = []
     for df, name in zip(dfs, names):
         df['length'] = df['end_time'] - df['start_time']
         df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
         gp = df.groupby('assessment')['length'].mean()
         _dfs.append(pd.DataFrame(columns=['video', 'mean_length', 'legend'], data=np.array([gp.index, gp.values, [name] * len(gp)]).T))
-    for _df in _dfs:
-        sns.distplot(_df['mean_length'], hist=False, ax=ax)
+    for color, _df in zip(colors, _dfs):
+        sns.distplot(_df['mean_length'], hist=False, ax=ax, color=color)
+    for l in ax.lines:
+        x1 = l.get_xydata()[:, 0]
+        y1 = l.get_xydata()[:, 1]
+        c = l.get_color()
+        ax.fill_between(x1, y1, alpha=0.1, color=c)
+    ax.set_xlim(right=50)
     # _df = pd.concat(_dfs).reset_index(drop=True)
     # ax = sns.displot(data=_df, x="mean_length", hue='legend', multiple='stack', kind='kde')
     ax.set(xlabel='Mean length')
-    fig.legend(labels=names, borderaxespad=2)
-    fig.tight_layout()
-    plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
-    plt.show()
+    ax.legend(labels=names, borderaxespad=2)
+    # plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
+    # plt.show()
 
 
 classmap = {0: 'Hand flapping',
@@ -277,26 +291,39 @@ def export_frames_for_figure():
 
 
 if __name__ == '__main__':
-    # train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
-    # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
-    # post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa.csv')
-    # post_qa['assessment'] = post_qa['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
-    # jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
-    # jordi = jordi[jordi['assessment'].isin(post_qa['assessment'].unique())]
-    # jordi = jordi[jordi['movement'] != 'NoAction']
-    # pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
-    export_frames_for_figure()
-    exit()
-    # bar_plot_lenghts(train, 'train')
-    # bar_plot_unique_children(train, 'train')
+    train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
+    pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
+    post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa.csv')
+    post_qa['assessment'] = post_qa['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
+    jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
+    jordi = jordi[jordi['assessment'].isin(post_qa['assessment'].unique())]
+    jordi = jordi[jordi['movement'] != 'NoAction']
+    pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
 
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.set_size_inches(15, 6)
+    bar_plot_lenghts(ax1, train)
+    bar_plot_unique_children(ax2, train)
+    fig.tight_layout()
+    plt.savefig(f'resources/figs/train_statistics.png', bbox_inches='tight')
+    plt.show()
+    # exit()
+    # export_frames_for_figure()
+    # exit()
+    sns.set_style(style='white')
     dfs, names = zip(*[(train, 'Train'), (pre_qa, 'Pre QA'), (post_qa, 'Post QA'), (jordi, 'Model')])
-    # for df, name in zip(dfs, names):
-    #     bar_plot_actions_count_dist(df, name)
-    #     bar_plot_actions_length_dist(df, name)
-    bar_plot_actions_count_dist(dfs, names)
-    bar_plot_actions_length_dist(dfs, names)
-
+    fig, ax = plt.subplots()
+    fig.set_size_inches(8, 6)
+    bar_plot_actions_count_dist(ax, dfs, names)
+    fig.tight_layout()
+    plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
+    plt.show()
+    fig, ax = plt.subplots()
+    fig.set_size_inches(8, 6)
+    bar_plot_actions_length_dist(ax, dfs, names)
+    fig.tight_layout()
+    plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
+    plt.show()
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']
