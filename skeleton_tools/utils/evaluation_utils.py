@@ -36,14 +36,14 @@ def unify(df):
                     i += 2
                 else:
                     break
-            _df.loc[_df.shape[0]] = [merge[0]['video'], merge[0]['start_time'], merge[-1]['end_time'], merge[0]['start_frame'], merge[-1]['end_frame'],
+            _df.loc[_df.shape[0]] = [merge[0]['video'], merge[0]['video_full_name'], merge[0]['video_path'], merge[0]['start_time'], merge[-1]['end_time'], merge[0]['start_frame'], merge[-1]['end_frame'],
                                      merge[0]['movement'], merge[0]['calc_date'], merge[0]['annotator'], calc_weighted_mean_score(merge)]
         else:
             start_time = _df.iloc[_df.shape[0] - 1]['end_time'] if i > 0 else curr['start_time']
             end_time = df.iloc[i + 1]['start_time'] if i < n - 1 else curr['end_time']
             start_frame = _df.iloc[_df.shape[0] - 1]['end_frame'] if i > 0 else curr['start_frame']
             end_frame = df.iloc[i + 1]['start_frame'] if i < n - 1 else curr['end_frame']
-            _df.loc[_df.shape[0]] = [curr['video'], start_time, end_time, start_frame, end_frame,
+            _df.loc[_df.shape[0]] = [curr['video'], curr['video_full_name'], curr['video_path'], start_time, end_time, start_frame, end_frame,
                                      curr['movement'], curr['calc_date'], curr['annotator'], curr['stereotypical_score']]
         i += 1
     return _df
@@ -69,7 +69,7 @@ def aggregate(df, threshold):
             else:
                 break
             j += 1
-        _df.loc[_df.shape[0]] = [r['video'], _s, _t, s, t, p, pd.Timestamp.now(), NET_NAME, np.mean(score)]
+        _df.loc[_df.shape[0]] = [r['video'], r['video_full_name'], r['video_path'], _s, _t, s, t, p, pd.Timestamp.now(), NET_NAME, np.mean(score)]
         i = j
     return unify(_df)
 
