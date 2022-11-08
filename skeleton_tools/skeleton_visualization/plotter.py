@@ -14,6 +14,7 @@ import pandas as pd
 import seaborn as sns
 from sklearn import metrics
 from tqdm import tqdm
+from scipy import stats
 
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.skeleton_visualization.numpy_visualizer import MMPoseVisualizer
@@ -104,104 +105,111 @@ def bar_plot_unique_children(ax, df):
     # plt.savefig(f'resources/figs/{name}_unique_children.png', bbox_inches='tight')
     # plt.show()
 
-# def bar_plot_actions_count_dist(df, name):
-#     fig, ax = plt.subplots()
-#     df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-#     gp = df.groupby('assessment')['video'].count()
-#     _df = pd.DataFrame(columns=['video', 'actions_count'], data=np.array([gp.index, gp.values]).T)
-#     ax = sns.histplot(data=_df, x="actions_count", bins=max(_df.shape[0] // 10, 20), kde=True)
-#     ax.set(title=name, xlabel='Actions count', ylabel='Assessments count')
-#     plt.savefig(f'resources/figs/{name}_actions_count_dist.png', bbox_inches='tight')
+def bar_plot_actions_count_dist(ax, df):
+    gp = df.groupby(['assessment', 'name']).agg({'video': 'count'}).reset_index()
+    gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
+    sns.histplot(data=gp, x='video', hue='name', multiple='dodge')
+    ax.set(xlabel='Actions count', ylabel='Assessments count')
+    # plt.savefig(f'resources/figs/actions_count_hist.png', bbox_inches='tight')
+    # plt.show()
+
+def bar_plot_actions_length_dist(ax, df):
+    gp = df.groupby(['assessment', 'name']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
+    gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
+    gp['rel_length'] = gp['length'] / gp['length_seconds']
+    sns.histplot(data=gp, x='rel_length', hue='name', multiple='dodge')
+    ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
+    # plt.savefig(f'resources/figs/length_hist.png', bbox_inches='tight')
+    # plt.show()
+
+def plot_model_vs_human_actions_count(ax, df1, df2):
+    g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
+    g2 = df2.groupby('assessment').agg({'name': 'count'}).reset_index()
+    df = pd.merge(g1, g2, on='assessment', how='inner')
+    df.columns = ['assessment', 'human_count', 'model_count']
+    df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
+    m = df[['human_count', 'model_count']].max().max()
+    sns.scatterplot(data=df, x='human_count', y='model_count', ax=ax)
+    sns.regplot(data=df, x='human_count', y='model_count', ax=ax)
+    ax.plot((0, m), (0, m))
+    # plt.show()
+
+def plot_model_vs_human_rel_length(ax, df1, df2):
+    gp = []
+    for df in [df1, df2]:
+        g = df.groupby('assessment').agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
+        g['rel_length'] = g['length'] / g['length_seconds']
+        gp.append(g[['assessment', 'rel_length']])
+    df = pd.merge(gp[0], gp[1], on='assessment', how='inner')
+    df.columns = ['assessment', 'human_rel_length', 'model_rel_length']
+    df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
+    m = df[['human_rel_length', 'model_rel_length']].max().max()
+    sns.scatterplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
+    sns.regplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
+    ax.plot((0, m), (0, m))
+    # plt.show()
+
+def bland_altman(ax, df1, df2):
+    g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
+    g2 = df2.groupby('assessment').agg({'name': 'count'}).reset_index()
+    df = pd.merge(g1, g2, on='assessment', how='inner')
+    df.columns = ['assessment', 'human_count', 'model_count']
+    df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
+    df['count_diff'] = df['human_count'] - df['model_count']
+    # sns.scatterplot(data=df, x='human_count', y='count_diff', ax=ax)
+    m = df['count_diff'].mean()
+    s = df['count_diff'].std()
+
+    ax.scatter(np.mean([df['human_count'], df['model_count']], axis=0), df['count_diff'])
+    ax.axhline(m, color='gray', linestyle='-')
+    ax.axhline(0, color='green', linestyle='-')
+    ax.axhline(m + 1.96 * s, color='gray', linestyle='--')
+    ax.axhline(m - 1.96 * s, color='gray', linestyle='--')
+    ax.set_ylim(-4 * s, 4 * s)
+
+
+# classmap = {0: 'Hand flapping',
+#             1: 'Tapping',
+#             2: 'Clapping',
+#             3: 'Fingers',
+#             4: 'Body rocking',
+#             5: 'Tremor',
+#             6: 'Spinning in circle',
+#             7: 'Toe walking',
+#             8: 'Back and forth',
+#             9: 'Head movement',
+#             10: 'Playing with object',
+#             11: 'Jumping in place'}
+# classmap = list(classmap.values())
+#
+#
+# def plot_scores_heatmap(preds_df):
+#     v = []
+#     for i in range(len(classmap)):
+#         df = preds_df[preds_df['y'] == i][preds_df.columns[1:]]
+#         v.append(df.mean().to_numpy())
+#     v = np.round(np.array(v), 3)
+#     df_cm = pd.DataFrame(v, index=classmap, columns=classmap)
+#     plt.figure(figsize=(10, 7))
+#     ax = sns.heatmap(df_cm, annot=True)
+#     ax.figure.tight_layout()
+#     plt.savefig(r'resources/figs/heatmap.png')
 #     plt.show()
-
-def bar_plot_actions_count_dist(ax, dfs, names):
-    colors = [f'#{i}' for i in ['6A4C93', '1982C4', '8AC926', 'FF595E']]
-    _dfs = []
-    for df, name in zip(dfs, names):
-        df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-        gp = df.groupby('assessment')['video'].count()
-        _dfs.append(pd.DataFrame(columns=['video', 'actions_count', 'legend'], data=np.array([gp.index, gp.values, [name] * len(gp)]).T))
-    for color, _df in zip(colors, _dfs):
-        sns.distplot(_df['actions_count'], hist=False, ax=ax, color=color) # TODO: kde_kws={'bw':0.25} , check qq plot with ilan
-    for l in ax.lines:
-        x1 = l.get_xydata()[:, 0]
-        y1 = l.get_xydata()[:, 1]
-        c = l.get_color()
-        ax.fill_between(x1, y1, alpha=0.1, color=c)
-    ax.set_xlim(right=200)
-    # _df = pd.concat(_dfs).reset_index(drop=True)
-    # ax = sns.displot(data=_df, x="actions_count", hue='legend', multiple='stack', kind='kde')
-    ax.set(xlabel='Actions count')
-    ax.legend(labels=names, borderaxespad=2)
-    # plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
-    # plt.show()
-
-def bar_plot_actions_length_dist(ax, dfs, names):
-    colors=[f'#{i}' for i in ['6A4C93', '1982C4', '8AC926', 'FF595E']]
-    _dfs = []
-    for df, name in zip(dfs, names):
-        df['length'] = df['end_time'] - df['start_time']
-        df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-        gp = df.groupby('assessment')['length'].mean()
-        _dfs.append(pd.DataFrame(columns=['video', 'mean_length', 'legend'], data=np.array([gp.index, gp.values, [name] * len(gp)]).T))
-    for color, _df in zip(colors, _dfs):
-        sns.distplot(_df['mean_length'], hist=False, ax=ax, color=color)
-    for l in ax.lines:
-        x1 = l.get_xydata()[:, 0]
-        y1 = l.get_xydata()[:, 1]
-        c = l.get_color()
-        ax.fill_between(x1, y1, alpha=0.1, color=c)
-    ax.set_xlim(right=50)
-    # _df = pd.concat(_dfs).reset_index(drop=True)
-    # ax = sns.displot(data=_df, x="mean_length", hue='legend', multiple='stack', kind='kde')
-    ax.set(xlabel='Mean length')
-    ax.legend(labels=names, borderaxespad=2)
-    # plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
-    # plt.show()
-
-
-classmap = {0: 'Hand flapping',
-            1: 'Tapping',
-            2: 'Clapping',
-            3: 'Fingers',
-            4: 'Body rocking',
-            5: 'Tremor',
-            6: 'Spinning in circle',
-            7: 'Toe walking',
-            8: 'Back and forth',
-            9: 'Head movement',
-            10: 'Playing with object',
-            11: 'Jumping in place'}
-classmap = list(classmap.values())
-
-
-def plot_scores_heatmap(preds_df):
-    v = []
-    for i in range(len(classmap)):
-        df = preds_df[preds_df['y'] == i][preds_df.columns[1:]]
-        v.append(df.mean().to_numpy())
-    v = np.round(np.array(v), 3)
-    df_cm = pd.DataFrame(v, index=classmap, columns=classmap)
-    plt.figure(figsize=(10, 7))
-    ax = sns.heatmap(df_cm, annot=True)
-    ax.figure.tight_layout()
-    plt.savefig(r'resources/figs/heatmap.png')
-    plt.show()
-
-
-def plot_conf_matrix(preds_df, norm=False):
-    y_hat = preds_df['y']
-    y_pred = np.argmax(preds_df[preds_df.columns[1:]].to_numpy(), axis=1)
-    cm = metrics.confusion_matrix(y_hat, y_pred)
-    if norm:
-        counts = preds_df.groupby('y')['0'].count().to_numpy()
-        cm = np.round(cm / counts, 3)
-    df_cm = pd.DataFrame(cm, index=classmap, columns=classmap)
-    plt.figure(figsize=(10, 7))
-    ax = sns.heatmap(df_cm, annot=True, fmt='g')
-    ax.figure.tight_layout()
-    plt.savefig(r'resources/figs/confusion_matrix.png')
-    plt.show()
+#
+#
+# def plot_conf_matrix(preds_df, norm=False):
+#     y_hat = preds_df['y']
+#     y_pred = np.argmax(preds_df[preds_df.columns[1:]].to_numpy(), axis=1)
+#     cm = metrics.confusion_matrix(y_hat, y_pred)
+#     if norm:
+#         counts = preds_df.groupby('y')['0'].count().to_numpy()
+#         cm = np.round(cm / counts, 3)
+#     df_cm = pd.DataFrame(cm, index=classmap, columns=classmap)
+#     plt.figure(figsize=(10, 7))
+#     ax = sns.heatmap(df_cm, annot=True, fmt='g')
+#     ax.figure.tight_layout()
+#     plt.savefig(r'resources/figs/confusion_matrix.png')
+#     plt.show()
 
 def get_intersection(interval1, interval2):
     new_min = max(interval1[0], interval2[0])
@@ -227,14 +235,6 @@ def draw_net_confidence(ax, jordi, agg, humans):
     intersection_length = sum([(t - s) for s, t in intersection])
     union_length = sum([(t-s) for s,t in (jordi_intervals + human_intervals)]) - intersection_length
     ax.text(0.005, 0.92, f'IoU: {round(intersection_length / union_length * 100)}%', fontsize=25, ha='left', va='center', transform=ax.transAxes)
-
-
-def aggregate_b(df): # TODO: Decide if using
-    _df = pd.DataFrame(columns=df.columns)
-    for i in range(0, df['end_frame'].max(), 30):
-        sdf = df[(df['start_frame'] <= i) & (i < df['end_frame'])]
-        _df.loc[_df.shape[0]] = [df['video'].loc[0], -1, -1, i, i + 30, -1, pd.to_datetime('now'), 'JORDI', sdf['stereotypical_score'].mean()]
-    return _df
 
 def draw_confidence_for_assessment(root, files, human_labels_path, show=False):
     init_directories(osp.join(root, 'figs'))
@@ -290,40 +290,57 @@ def export_frames_for_figure():
         v.export_frames(vid, j, f'C:/Users/owner/Desktop/out/{name}')
 
 
-if __name__ == '__main__':
+def generate_statistics():
+    db = pd.read_csv(r'Z:\recordings\db_info.csv')
     train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
-    pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
-    post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa.csv')
-    post_qa['assessment'] = post_qa['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
+    # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
+    post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa2.csv')
     jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
-    jordi = jordi[jordi['assessment'].isin(post_qa['assessment'].unique())]
     jordi = jordi[jordi['movement'] != 'NoAction']
-    pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
+    exclude = ['666852718_ADOS_Clinical_301120', '663954442_ADOS_Clinical_210920', '666814726_ADOS_Clinical_110717']
+    # pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
+    # fig, (ax1, ax2) = plt.subplots(1, 2)
+    # fig.set_size_inches(15, 6)
+    # bar_plot_lenghts(ax1, train)
+    # bar_plot_unique_children(ax2, train)
+    # fig.tight_layout()
+    # plt.savefig(f'resources/figs/train_statistics.png', bbox_inches='tight')
+    # plt.show()
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    fig.set_size_inches(15, 6)
-    bar_plot_lenghts(ax1, train)
-    bar_plot_unique_children(ax2, train)
-    fig.tight_layout()
-    plt.savefig(f'resources/figs/train_statistics.png', bbox_inches='tight')
-    plt.show()
-    # exit()
-    # export_frames_for_figure()
-    # exit()
     sns.set_style(style='white')
-    dfs, names = zip(*[(train, 'Train'), (pre_qa, 'Pre QA'), (post_qa, 'Post QA'), (jordi, 'Model')])
-    fig, ax = plt.subplots()
-    fig.set_size_inches(8, 6)
-    bar_plot_actions_count_dist(ax, dfs, names)
-    fig.tight_layout()
-    plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
-    plt.show()
-    fig, ax = plt.subplots()
-    fig.set_size_inches(8, 6)
-    bar_plot_actions_length_dist(ax, dfs, names)
-    fig.tight_layout()
-    plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
-    plt.show()
+    dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
+    for df, name in zip(dfs, names):
+        df['basename'] = df['video'].apply(lambda v: osp.splitext(v)[0])
+        df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
+        df['name'] = name
+        df.drop(df[df['video'].isin(exclude)].index, inplace=True)
+    df = pd.concat(dfs)
+    df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-1]))
+    df['child'] = df['assessment'].apply(lambda a: a.split('_')[0])
+    df['length'] = df['end_time'] - df['start_time']
+    df[['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']] = \
+        df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
+                 axis=1,
+                 result_type="expand")
+
+    def display(f):
+        fig, ax = plt.subplots()
+        fig.set_size_inches(8, 6)
+        f(ax)
+        fig.tight_layout()
+        # plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
+        plt.show()
+
+    display(lambda ax: bar_plot_actions_count_dist(ax, df))
+    display(lambda ax: bar_plot_actions_length_dist(ax, df))
+    # plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
+    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
+    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
+    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
+
+if __name__ == '__main__':
+    generate_statistics()
+
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']
