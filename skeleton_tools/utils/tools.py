@@ -15,20 +15,26 @@ import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
-def scan_db():
-    root = r'Z:\recordings'
-    db = pd.DataFrame(columns=['video', 'path', 'width', 'height', 'fps', 'frame_count', 'length_seconds'])
+def scan_db(root=r'Z:\recordings', properties=False, save=None):
+    db = pd.DataFrame(columns=['filename', 'basename', 'file_path', 'width', 'height', 'fps', 'frame_count', 'length_seconds'])
     for r, d, fs in os.walk(root):
         if 'Asaf' in r or 'Face camera' in r:
             continue
         for f in fs:
             if f.lower().endswith('.mp4') or f.lower().endswith('.avi'):
                 try:
-                    (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
-                    db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
+                    if properties:
+                        (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
+                    else:
+                        (width, height), fps, frame_count, length_seconds = (None, None), None, None, None
+                    db.loc[db.shape[0]] = [f, osp.splitext(f)[0], osp.join(r, f), width, height, fps, frame_count, length_seconds]
                 except Exception as e:
                     print(f'Error extracting information from {f}.')
-    db.to_csv(r'Z:\recordings\db_info.csv', index=False)
+    if not properties:
+        db = db[['filename', 'basename', 'file_path']]
+    if save is not None:
+        db.to_csv(save, index=False)
+    return db
 
 def create_config(dict_conf, out=None):
     for k, v in dict_conf.items():
@@ -208,13 +214,3 @@ def combine_meta_data(face_dir, hand_dir, combined_dir):
             face['people'][i]['hand_left_keypoints_2d'] = hand['people'][i]['hand_left_keypoints_2d']
             face['people'][i]['hand_right_keypoints_2d'] = hand['people'][i]['hand_right_keypoints_2d']
         write_json(face, osp.join(combined_dir, name))
-
-def collect_labels(root, model_name, file_extension='annotations', out=None):
-    files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in os.listdir(root)]
-    dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
-    df = pd.concat(dfs)
-    df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-    df = df.sort_values(by=['assessment', 'start_time'])
-    if out:
-        df.to_csv(out, index=False)
-    return df

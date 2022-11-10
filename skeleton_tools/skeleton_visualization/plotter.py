@@ -19,8 +19,8 @@ from scipy import stats
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.skeleton_visualization.numpy_visualizer import MMPoseVisualizer
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
-from skeleton_tools.utils.evaluation_utils import intersect
-from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, collect_labels
+from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions
+from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -290,14 +290,16 @@ def export_frames_for_figure():
         v.export_frames(vid, j, f'C:/Users/owner/Desktop/out/{name}')
 
 
-def generate_statistics():
+def generate_statistics(dfs, names):
     db = pd.read_csv(r'Z:\recordings\db_info.csv')
-    train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
-    # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
-    post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa2.csv')
-    jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
-    jordi = jordi[jordi['movement'] != 'NoAction']
-    exclude = ['666852718_ADOS_Clinical_301120', '663954442_ADOS_Clinical_210920', '666814726_ADOS_Clinical_110717']
+    db['video_full_name'] = db['video']
+    db['video'] = db['video'].apply(lambda v: osp.splitext(v)[0])
+    # train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
+    # # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
+    # post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa2.csv')
+    # jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
+    # jordi = jordi[jordi['movement'] != 'NoAction']
+    # exclude = ['666852718_ADOS_Clinical_301120', '663954442_ADOS_Clinical_210920', '666814726_ADOS_Clinical_110717']
     # pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
     # fig, (ax1, ax2) = plt.subplots(1, 2)
     # fig.set_size_inches(15, 6)
@@ -308,20 +310,20 @@ def generate_statistics():
     # plt.show()
 
     sns.set_style(style='white')
-    dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
+    # dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
     for df, name in zip(dfs, names):
         df['basename'] = df['video'].apply(lambda v: osp.splitext(v)[0])
         df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
         df['name'] = name
-        df.drop(df[df['video'].isin(exclude)].index, inplace=True)
+        # df.drop(df[df['video'].isin(exclude)].index, inplace=True)
     df = pd.concat(dfs)
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-1]))
     df['child'] = df['assessment'].apply(lambda a: a.split('_')[0])
     df['length'] = df['end_time'] - df['start_time']
-    df[['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']] = \
-        df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
-                 axis=1,
-                 result_type="expand")
+    # df[['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']] = \
+    #     df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
+    #              axis=1,
+    #              result_type="expand")
 
     def display(f):
         fig, ax = plt.subplots()
@@ -334,13 +336,24 @@ def generate_statistics():
     display(lambda ax: bar_plot_actions_count_dist(ax, df))
     display(lambda ax: bar_plot_actions_length_dist(ax, df))
     # plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
-    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
-    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
-    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] == 'Model']))
+    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
+    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
+    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
 
 if __name__ == '__main__':
-    generate_statistics()
+    root = r'Z:\Users\TalBarami\jordi_cross_validation'
 
+    model = 'cv0_epoch_16.pth'
+    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
+    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+
+    model = 'cv0_epoch_50.pth'
+    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
+    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+
+    model = 'cv1_epoch_27.pth'
+    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
+    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']

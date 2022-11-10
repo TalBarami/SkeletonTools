@@ -141,12 +141,12 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
     for t in thresholds:
         print(f'Threshold: {t}')
         out_file = osp.join(out_path, f'predictions_{t}.csv')
-        if osp.exists(out_file):
-            agg = pd.read_csv(out_file)
-        else:
-            print(f'Preparing dataframes...')
-            agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
-            agg.to_csv(out_file, index=False)
+        # if osp.exists(out_file):
+        #     agg = pd.read_csv(out_file)
+        # else:
+        print(f'Preparing dataframes...')
+        agg = pd.concat([prepare(aggregate(df, t)) for _, df in dfs.groupby('video')])
+        agg.to_csv(out_file, index=False)
         n, m = agg['video'].nunique(), agg['assessment'].nunique()
         if per_assessment:
             agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
@@ -165,13 +165,15 @@ def aggregate_table(df):
     df = df[df['movement'] != 'NoAction']
     df['stereotypical_length'] = (df['end_time'] - df['start_time'])
     df['stereotypical_relative_length'] = df['stereotypical_length'] / df['length_seconds']
-    table = df.groupby('video').agg({'length_seconds': 'mean', 'stereotypical_length': ['sum', 'mean', 'count'], 'stereotypical_relative_length': ['sum', 'mean']})
-    out = pd.DataFrame(columns=['video', 'length_seconds', 'count_stereotypical', 'sum_stereotypical_length', 'mean_stereotypical_length', 'sum_stereotypical_relative_length', 'mean_stereotypical_relative_length'])
-    out['video'] = table.index
-    out['length_seconds'] = table['length_seconds']['mean'].values
-    out[['sum_stereotypical_length', 'mean_stereotypical_length', 'count_stereotypical']] = table['stereotypical_length'].values
-    out[['sum_stereotypical_relative_length', 'mean_stereotypical_relative_length']] = table['stereotypical_relative_length'].values
-    return out
+    table = df.groupby(['video', 'annotator']).agg({'length_seconds': 'mean', 'stereotypical_length': ['sum', 'mean', 'count'], 'stereotypical_relative_length': ['sum', 'mean']})
+    table.columns = ['_'.join(col).strip() for col in table.columns.values]
+    table = table.reset_index()
+    # out = pd.DataFrame(columns=['video', 'length_seconds', 'count_stereotypical', 'sum_stereotypical_length', 'mean_stereotypical_length', 'sum_stereotypical_relative_length', 'mean_stereotypical_relative_length'])
+    # out['video'] = table.index
+    # out['length_seconds'] = table['length_seconds']['mean'].values
+    # out[['sum_stereotypical_length', 'mean_stereotypical_length', 'count_stereotypical']] = table['stereotypical_length'].values
+    # out[['sum_stereotypical_relative_length', 'mean_stereotypical_relative_length']] = table['stereotypical_relative_length'].values
+    return table
 
 
 adjustments = read_json(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') if osp.exists(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\adjustments.json') else {}
@@ -197,6 +199,7 @@ def get_adjust(name):
 
 def aggregate_cameras(df, fillna=False):
     length = df['length_seconds'].max()
+    annotator = df['annotator'].iloc[0]
     dfs = [g for v, g in df.groupby('video')]
     out = pd.DataFrame(columns=['assessment', 'start_time', 'end_time', 'movement'])
     for df in dfs:
@@ -220,6 +223,7 @@ def aggregate_cameras(df, fillna=False):
         out.loc[out.shape[0]] = (assessment, s, length, 'NoAction')
     out['length_seconds'] = length
     out['video'] = out['assessment']
+    out['annotator'] = annotator
     out = out.sort_values(by=['assessment', 'start_time']).reset_index(drop=True)
     return out
 
@@ -228,7 +232,8 @@ def aggregate_cameras_for_annotations(annotations, fillna=False):
     groups = list(annotations.groupby('assessment'))
     result = []
     for assessment, group in groups:
-        result.append(aggregate_cameras(group, fillna=fillna))
+        result.append([aggregate_cameras(g, fillna=fillna) for _, g in group.groupby('annotator')])
+    result = [d for dfs in result for d in dfs]
     result = pd.concat(result).sort_values(by=['assessment', 'start_time'])
     result['video'] = result['assessment']
     return result
@@ -243,10 +248,47 @@ def intersect(*lst, on='assessment', exclude=None):
     return out
 
 
+def collect_labels(root, model_name, file_extension='annotations', out=None):
+    files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in os.listdir(root)]
+    dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
+    df = pd.concat(dfs)
+    df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
+    df = df.sort_values(by=['assessment', 'start_time'])
+    if out:
+        df.to_csv(out, index=False)
+    return df
+
+def collect_predictions(predictions_dir, experiment_name=None, out_dir=None, model_name=None, subset=None):
+    if model_name is None:
+        name = experiment_name
+        df = pd.read_csv(osp.join(predictions_dir, f'{experiment_name}.csv'))
+    else:
+        name = model_name if experiment_name is None else f'{experiment_name}_{model_name}'
+        df = collect_labels(predictions_dir, osp.join('jordi', model_name))
+    if subset is not None:
+        df = df[df['video'].isin(subset)]
+    # manual_fix = {
+    #     '671336821_ADOS_Clinical_220118': 2268
+    # }
+    df = prepare(df)
+    # df['length_seconds'] = df.apply(lambda row: manual_fix[row['assessment']] if row['assessment'] in manual_fix.keys() else row['length_seconds'], axis=1)
+    summary_df = aggregate_table(df)
+    assessment_df = aggregate_cameras_for_annotations(df)
+    summary_assessment_df = aggregate_table(assessment_df)
+
+    if out_dir is not None:
+        df.to_csv(osp.join(out_dir, f'base_{name}.csv'), index=False)
+        summary_df.to_csv(osp.join(out_dir, f'summary_{name}.csv'), index=False)
+        assessment_df.to_csv(osp.join(out_dir, f'assessment_{name}.csv'), index=False)
+        summary_assessment_df.to_csv(osp.join(out_dir, f'summary_assessment_{name}.csv'), index=False)
+    return df, summary_df, assessment_df, summary_assessment_df
+
 def prepare(df, remove_noact=False):
     if remove_noact:
         df = df[df['movement'] != 'NoAction']
     db = pd.read_csv(DB_PATH)
-    df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
+    df['annotator'] = df['annotator'].apply(lambda a: NET_NAME if a == NET_NAME else 'Human')
+    df[['width', 'height', 'fps', 'frame_count', 'length_seconds']] = df.apply(lambda row: db[db['video'] == row['video_full_name']].iloc[0][['width', 'height', 'fps', 'frame_count', 'length_seconds']], axis=1)
+    # df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video_full_name']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
     return df
