@@ -6,6 +6,7 @@ import subprocess
 from json import JSONDecodeError
 from os import path as osp
 from pathlib import Path
+import itertools
 
 import ffmpeg
 from omegaconf import OmegaConf
@@ -214,3 +215,9 @@ def combine_meta_data(face_dir, hand_dir, combined_dir):
             face['people'][i]['hand_left_keypoints_2d'] = hand['people'][i]['hand_left_keypoints_2d']
             face['people'][i]['hand_right_keypoints_2d'] = hand['people'][i]['hand_right_keypoints_2d']
         write_json(face, osp.join(combined_dir, name))
+
+def pairwise(iterable):
+    "s -> (s0, s1), (s1, s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)

@@ -104,7 +104,7 @@ class OpenposeInitializer:
             data = self.openpose_to_json(openpose_output_path)
             adj = int(frame_count - len(data))
             if adj != 0:
-                self.logger.warning(f'Skeleton {basename} requires adjustments.')
+                self.logger.warning(f'Skeleton {basename} requires adjustments: video={frame_count}, T={len(data)}')
             skeleton = {
                 'name': basename,
                 'video_path': src_path,

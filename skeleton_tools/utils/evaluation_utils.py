@@ -272,9 +272,7 @@ def collect_predictions(predictions_dir, experiment_name=None, out_dir=None, mod
     # }
     df = prepare(df)
     # df['length_seconds'] = df.apply(lambda row: manual_fix[row['assessment']] if row['assessment'] in manual_fix.keys() else row['length_seconds'], axis=1)
-    summary_df = aggregate_table(df)
-    assessment_df = aggregate_cameras_for_annotations(df)
-    summary_assessment_df = aggregate_table(assessment_df)
+    summary_df, assessment_df, summary_assessment_df = generate_aggregations(df)
 
     if out_dir is not None:
         df.to_csv(osp.join(out_dir, f'base_{name}.csv'), index=False)
@@ -292,3 +290,10 @@ def prepare(df, remove_noact=False):
     # df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video_full_name']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
     return df
+
+def generate_aggregations(df):
+    summary_df = aggregate_table(df)
+    assessment_df = aggregate_cameras_for_annotations(df)
+    summary_assessment_df = aggregate_table(assessment_df)
+
+    return summary_df, assessment_df, summary_assessment_df
