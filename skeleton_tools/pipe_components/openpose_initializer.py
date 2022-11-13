@@ -27,7 +27,7 @@ class SkeletonSource(Enum):
 
 
 class OpenposeInitializer:
-    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path=OPENPOSE_ROOT, as_img_dir=False, logger=None):
+    def __init__(self, openpose_layout, in_channels=3, length=LENGTH, num_person_in=5, num_person_out=5, open_pose_path=OPENPOSE_ROOT, as_img_dir=False, gpu_id=None, logger=None):
         if logger is None:
             self.logger = init_logger('OpenPoseInitializer')
         else:
@@ -40,6 +40,7 @@ class OpenposeInitializer:
         self.num_person_out = num_person_out
         self.open_pose_path = open_pose_path
         self.as_img_dir = as_img_dir
+        self.gpu_id = gpu_id
 
     def _video2img(self, video_path, out_path):
         name = osp.splitext(osp.basename(video_path))[0]
@@ -73,6 +74,9 @@ class OpenposeInitializer:
             params['hand'] = ''
         if self.layout.name == 'BODY_21A':
             params['tracking'] = 1
+        if self.gpu_id is not None:
+            params['num_gpu'] = 1
+            params['num_gpu_start'] = self.gpu_id
 
         args = ' '.join([f'--{k} {v}' for k, v in params.items()])
 
