@@ -158,7 +158,9 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
         a.append(accuracy)
         p.append(precision)
         r.append(recall)
-    return thresholds, a, p, r
+    a, p, r = np.array(a), np.array(p), np.array(r)
+    f1 = 2 * p * r / (p + r)
+    return thresholds, a, p, r, f1
 
 
 def aggregate_table(df):
