@@ -17,7 +17,7 @@ from tqdm import tqdm
 from scipy import stats
 
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
-from skeleton_tools.skeleton_visualization.numpy_visualizer import MMPoseVisualizer
+from skeleton_tools.skeleton_visualization.mmpose_visualizer import MMPoseVisualizer
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
 from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions
 from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from skeleton_tools.skeleton_visualization.draw_utils import blur_area, draw_pid, draw_bbox
@@ -22,7 +23,8 @@ class SkeletonVisualizer(ABC):
         self.blur_face = blur_face
         self.display_child_bbox = display_child_bbox
 
-    def draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, thickness=5, resolution=None, pids=None, child_id=None, child_box=None, detection_conf=None):
+    def _draw_skeletons(self, frame, skeletons, scores, epsilon=0.25, thickness=5,
+                        resolution=None, pids=None, child_id=None, child_box=None, detection_conf=None, saliency=None):
         img = np.copy(frame)
 
         if pids is None:
@@ -46,7 +48,8 @@ class SkeletonVisualizer(ABC):
             if img.shape[-1] > 3:
                 color += (255,)
 
-            img = self.draw_skeleton(img, pose, score, thickness=thickness, edge_color=color, epsilon=epsilon)
+            img = self.draw_skeleton(img, pose, score, thickness=thickness, edge_color=color, epsilon=epsilon,
+                                     saliency=saliency if child_id == lst_id else None)
 
             if self.display_pid:
                 draw_pid(img, pose.T, score, pid, color)
@@ -62,7 +65,7 @@ class SkeletonVisualizer(ABC):
 
         return img
 
-    def draw_skeleton(self, frame, pose, score, edge_color=None, thickness=5, epsilon=0.05):
+    def draw_skeleton(self, frame, pose, score, edge_color=None, saliency=None, thickness=5, epsilon=0.05):
         img = np.copy(frame)
         if edge_color is None:
             edge_color = (0, 0, 255)
@@ -72,69 +75,95 @@ class SkeletonVisualizer(ABC):
         for (v1, v2) in self.graph_layout.pairs():
             if score[v1] > epsilon and score[v2] > epsilon:
                 cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=thickness, lineType=cv2.LINE_AA)
+        if saliency is not None:
+            cmap = plt.get_cmap("inferno")
+            # mask = img * 0
+            for j, sal in zip(pose, saliency):
+                if any(np.isnan(s) for s in sal):
+                    continue
+                intensity = sal.mean()
+                cv2.circle(img=img, center=j, radius=0, color=np.array(cmap(intensity)) * 255, thickness=int(intensity ** 0.5 * 20))
+            # blurred_mask = cv2.blur(mask, (12, 12))
+            # img = img * 0.25 + blurred_mask * 0.75
         # for i, (x, y) in enumerate(pose):
         #     if score[i] > epsilon:
         #         jcolor, jsize = (tuple(np.array(plt.cm.jet(score[i])) * 255), 4) if self.show_confidence else (joint_color, 2)
         #         cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
         return img
 
-    def create_skeleton_video(self, skeleton_json, out_path):
-        fps, length, (width, height), kp, c, pids = self.get_video_info(None, skeleton_json)
+    def draw_skeletons(self, frame, i, skeleton_data):
+        return self._draw_skeletons(frame,
+                                    skeleton_data['keypoint'][i], skeleton_data['keypoint_score'][i],
+                                    resolution=(skeleton_data['width'], skeleton_data['height']), pids=skeleton_data['pids'][i],
+                                    child_id=skeleton_data['child_ids'][i] if 'child_ids' in skeleton_data.keys() else None,
+                                    child_box=skeleton_data['child_bbox'][i] if 'child_bbox' in skeleton_data.keys() else None,
+                                    detection_conf=skeleton_data['child_detected'][i] if 'child_detected' in skeleton_data.keys() else None,
+                                    saliency=skeleton_data['saliency'][i] if 'saliency' in skeleton_data.keys() else None)
+
+    def create_skeleton_video(self, skeleton_data, out_path):
+        skeleton_data = self.prepare(None, skeleton_data)
+        fps, length, resolution = skeleton_data['fps'], skeleton_data['length'], (skeleton_data['width'], skeleton_data['height'])
+        kp, c, pids = skeleton_data['keypoint'], skeleton_data['keypoint_score'], skeleton_data['pids']
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(out_path, fourcc, fps, resolution)
 
         for i in tqdm(range(length), desc="Writing video result"):
             if i < len(kp):
-                skel_frame = self.draw_skeletons(np.zeros((height, width, 3), dtype=np.uint8), kp[i], c[i], resolution=(width, height), pids=pids[i])
+                skel_frame = self.draw_skeletons(np.zeros((*resolution, 3), dtype=np.uint8), i, skeleton_data)
                 out.write(skel_frame)
         out.release()
 
-    def create_double_frame_video(self, video_path, skeleton_data, out_path, start=None, end=None):
-        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton_data)
+    def create_video(self, video_path, skeleton_data, out_path, start=None, end=None, double_frame=False):
+        skeleton_data = self.prepare(video_path, skeleton_data)
+        fps, length, (width, height) = skeleton_data['fps'], skeleton_data['length'], (skeleton_data['width'], skeleton_data['height'])
+        cmap = plt.get_cmap("inferno")
         start = int(0 if start is None else start * fps)
         end = int(length if end is None else end * fps)
-
+        width_multiplier = 2 if double_frame else 1
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(out_path, fourcc, fps, (2 * width, height))
+        out = cv2.VideoWriter(out_path, fourcc, fps, (width_multiplier * width, height))
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
         for i in tqdm(range(start, end), desc="Writing video result"):
             ret, frame = cap.read()
-            skel_frame = np.zeros_like(frame)
-            if child_ids is not None:
-                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
-            else:
-                skel_frame = self.draw_skeletons(skel_frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
-            out.write(np.concatenate((frame, skel_frame), axis=1))
+            skel_frame = self.draw_skeletons(np.zeros_like(frame) if double_frame else frame, i, skeleton_data)
+            if 'time_importance' in skeleton_data.keys():
+                skel_frame = cv2.circle(img=skel_frame, center=(0, width // width_multiplier), radius=0,
+                                        color=np.array(cmap(int(skeleton_data['time_importance'][0][i]))) * 255, thickness=30)
+            out.write(np.concatenate((frame, skel_frame), axis=1) if double_frame else skel_frame)
         cap.release()
         out.release()
 
-    def create_video(self, video_path, skeleton_data, out_path):
-        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton_data)
-
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
-        cap = cv2.VideoCapture(video_path)
-
-        for j in tqdm(range(length), desc="Writing video result"):
-            ret, frame = cap.read()
-            if ret:
-                if j < adjust:
-                    continue
-                i = j - adjust
-                if child_ids is not None:
-                    frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
-                else:
-                    frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
-                out.write(frame)
-            else:
-                break
-        cap.release()
-        out.release()
+    # def create_video(self, video_path, skeleton_data, out_path):
+    #     # fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.prepare(video_path, skeleton_data)
+    #
+    #     skeleton_data = self.prepare(video_path, skeleton_data)
+    #     fps, length, (width, height) = skeleton_data['fps'], skeleton_data['length'], (skeleton_data['width'], skeleton_data['height'])
+    #     kp, c, pids = skeleton_data['keypoint'], skeleton_data['keypoint_score'], skeleton_data['pids']
+    #
+    #     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    #     out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    #     cap = cv2.VideoCapture(video_path)
+    #
+    #     for j in tqdm(range(length), desc="Writing video result"):
+    #         ret, frame = cap.read()
+    #         if ret:
+    #             if j < adjust:
+    #                 continue
+    #             i = j - adjust
+    #             if child_ids is not None:
+    #                 frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i], child_id=child_ids[i], child_box=child_bbox[i], detection_conf=detections[i])
+    #             else:
+    #                 frame = self.draw_skeletons(frame, kp[i], c[i], resolution=(width, height), pids=pids[i])
+    #             out.write(frame)
+    #         else:
+    #             break
+    #     cap.release()
+    #     out.release()
 
     def export_frames(self, video_path, skeleton, out_path):
         Path(out_path).mkdir(parents=True, exist_ok=True)
-        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.get_video_info(video_path, skeleton)
+        fps, length, (width, height), kp, c, pids, child_ids, detections, child_bbox, adjust = self.prepare(video_path, skeleton)
         cap = cv2.VideoCapture(video_path)
 
         for i in tqdm(range(length), desc="Writing video result"):
@@ -148,12 +177,12 @@ class SkeletonVisualizer(ABC):
 
     def to_image(self, frame):
         top, bottom, left, right = [20] * 4
-        frame = cv2.copyMakeBorder(frame, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(128,128,128))
+        frame = cv2.copyMakeBorder(frame, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(128, 128, 128))
         frame[:, :, 3] = (255 * np.where((frame[:, :, :3] != 255).any(axis=2), 1, 0.6)).astype(np.uint8)
         return frame
 
     def sample_frames(self, video_path, skeleton_data, frame_idxs, out_dir):
-        fps, frames_count, (width, height), kp, c, pids, child_ids, detections, boxes = self.get_video_info(video_path, skeleton_data)
+        fps, frames_count, (width, height), kp, c, pids, child_ids, detections, boxes = self.prepare(video_path, skeleton_data)
         cap = cv2.VideoCapture(video_path)
         white = np.ones((height, width, 4)) * 255
 
@@ -171,9 +200,8 @@ class SkeletonVisualizer(ABC):
                 cv2.imwrite(osp.join(out_dir, f'skeleton_{i}.png'), skeleton)
                 cv2.imwrite(osp.join(out_dir, f'skeleton_cd_{i}.png'), skeleton_child_detect)
 
-
     @abstractmethod
-    def get_video_info(self, video_path, skeleton_data):
+    def prepare(self, video_path, skeleton_data):
         pass
 
     # def make_skeleton_video(self, skeleton, dst_file, display_pid=False, display_bbox=False, is_normalized=False, is_centralized=False, visualize_confidence=False):

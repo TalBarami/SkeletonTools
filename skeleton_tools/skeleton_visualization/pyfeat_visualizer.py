@@ -16,7 +16,7 @@ class PyfeatVisualizer(SkeletonVisualizer):
     #         draw_bbox(frame, bbox, color)
     #     return frame
 
-    def get_video_info(self, video_path, pyfeat_data):
+    def prepare(self, video_path, pyfeat_data):
         raise NotImplementedError('TBI')
         # resolution, fps, frame_count, length = get_video_properties(video_path)
         # return fps, length, resolution, kp, c, pids, child_ids, detections, child_bbox, adjust

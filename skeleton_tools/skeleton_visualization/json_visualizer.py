@@ -11,7 +11,7 @@ class JsonVisualizer(SkeletonVisualizer):
         super().__init__(graph_layout, display_pid, display_bbox, denormalize, decentralize, blur_face, show_confidence)
 
 
-    def get_video_info(self, video_path, skeleton_json):
+    def prepare(self, video_path, skeleton_json):
         if video_path is None:
             (width, height), fps, frames_count = skeleton_json['resolution'], skeleton_json['fps'], skeleton_json['length']
         else:
