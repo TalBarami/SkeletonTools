@@ -255,6 +255,7 @@ def collect_labels(root, model_name, file_extension='annotations', out=None):
     dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
     df = pd.concat(dfs)
     df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
+    df['child_id'] = df['assessment'].apply(lambda s: s.split('_')[0]).astype(int)
     df = df.sort_values(by=['assessment', 'start_time'])
     if out:
         df.to_csv(out, index=False)

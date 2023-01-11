@@ -17,7 +17,8 @@ import cv2
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
 def scan_db(root=r'Z:\recordings', properties=False, save=None):
-    db = pd.DataFrame(columns=['filename', 'basename', 'file_path', 'width', 'height', 'fps', 'frame_count', 'length_seconds'])
+    prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
+    db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
     for r, d, fs in os.walk(root):
         if 'Asaf' in r or 'Face camera' in r:
             continue
@@ -28,11 +29,14 @@ def scan_db(root=r'Z:\recordings', properties=False, save=None):
                         (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
                     else:
                         (width, height), fps, frame_count, length_seconds = (None, None), None, None, None
-                    db.loc[db.shape[0]] = [f, osp.splitext(f)[0], osp.join(r, f), width, height, fps, frame_count, length_seconds]
+                    db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
                 except Exception as e:
                     print(f'Error extracting information from {f}.')
+    db['basename'] = db['filename'].apply(lambda s: osp.splitext(s)[0])
+    db['assessment'] = db['basename'].apply(lambda s: '_'.join(s.split('_')[:4]))
+    db['child_id'] = db['filename'].apply(lambda s: s.split('_')[0])
     if not properties:
-        db = db[['filename', 'basename', 'file_path']]
+        db = db[[c for c in db.columns if c not in prop_cols]]
     if save is not None:
         db.to_csv(save, index=False)
     return db
