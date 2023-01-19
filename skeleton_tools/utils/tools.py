@@ -143,7 +143,10 @@ def get_video_properties(filename, method='ffmpeg'):
 
         resolution = resolution_candidates[0] if len(resolution_candidates) > 0 else None
         fps = eval(fps_candidates[0]) if len(fps_candidates) > 0 else None
-        length = eval(vinf['format']['duration']) if 'format' in vinf.keys() and 'duration' in vinf['format'].keys() else None
+        length_candidates = [vinf['streams'][i]['duration'] for i in range(len(vinf['streams'])) if 'duration' in vinf['streams'][i].keys()]
+        if 'format' in vinf.keys() and 'duration' in vinf['format'].keys():
+            length_candidates.append(vinf['format']['duration'])
+        length = eval(length_candidates[0]) if len(length_candidates) > 0 else None
         frame_candidates = [eval(vinf['streams'][i]['nb_frames']) for i in range(len(vinf['streams'])) if 'nb_frames' in vinf['streams'][i].keys()]
         frame_count = int(np.max(frame_candidates)) if len(frame_candidates) > 0 else int(np.ceil(length * fps)) if length and fps else None
     return resolution, fps, frame_count, length
