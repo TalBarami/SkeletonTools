@@ -8,7 +8,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from skeleton_tools.skeleton_visualization.draw_utils import blur_area, draw_pid, draw_bbox
 from skeleton_tools.utils.constants import COLORS, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
 

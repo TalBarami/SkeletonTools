@@ -1,0 +1,85 @@
+from abc import ABC, abstractmethod
+
+import numpy as np
+
+from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
+from skeleton_tools.openpose_layouts.face import PYFEAT_FACIAL
+from skeleton_tools.utils.skeleton_utils import bounding_box
+from skeleton_tools.utils.tools import read_pkl, write_pkl
+
+
+class VisualizerDataExtractor(ABC):
+    def __init__(self, graph_layout):
+        self.graph_layout = graph_layout
+        self.epsilon = 1e-1
+
+    @abstractmethod
+    def _extract(self, data):
+        pass
+
+    def __call__(self, data):
+        return self._extract(data)
+
+    def _assign_locations(self, boxes):
+        M, T = boxes.shape[:2]
+        out = np.zeros((*boxes.shape[:2], 2), dtype=np.int32)
+        for i in range(M):
+            for t in range(T):
+                (cx, cy), (w, h) = boxes[i, t]
+                out[i, t] = np.array([cx - w // 2, cy - h // 2])
+        return out
+
+    def _assign_labels(self, result, cids):
+        M, T = result['landmarks'].shape[:2]
+        result['label_text'] = np.array([['Child' if cids[t] == i else 'Adult' for t in range(T)] for i in range(M)])
+        result['colors'] = np.array([[(0, 0, 255) if cids[t] == i else (255, 0, 0) for t in range(T)] for i in range(M)])
+        result['label_location'] = self._assign_locations(result['boxes'])
+
+class MMPoseDataExtractor(VisualizerDataExtractor):
+    def __init__(self, graph_layout=COCO_LAYOUT):
+        super().__init__(graph_layout)
+
+    def _gen_boxes(self, landmarks, landmarks_scores):
+        M, T = landmarks.shape[:2]
+        boxes = np.array([[bounding_box(landmarks[i, t], landmarks_scores[i, t]) for t in range(T)] for i in range(M)])
+        return boxes
+
+    def _extract(self, data):
+        if type(data) == str:
+            data = read_pkl(data)
+        landmarks, landmarks_scores, cids = data['keypoint'], data['keypoint_score'], data['child_ids']
+
+        result = {'landmarks': landmarks, 'landmarks_scores': landmarks_scores,
+                  'resolution': data['img_shape'], 'fps': data['fps'], 'frame_count': data['total_frames'], 'duration_seconds': data['length_seconds'],
+                  'video_path': data['video_path'], 'filename': data['frame_dir'], 'segment_name': data['segment_name'],
+                  'child_ids': cids, 'child_detection_scores': data['child_detected']}
+
+        face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in self.graph_layout.face_joints()])]
+        result['boxes'] = self._gen_boxes(landmarks, landmarks_scores)
+        result['face_boxes'] = self._gen_boxes(landmarks[:, :, face_joints], landmarks_scores[:, :, face_joints])
+        self._assign_labels(result, cids)
+        return data
+
+
+class PyfeatDataExtractor(VisualizerDataExtractor):
+    def __init__(self, graph_layout=PYFEAT_FACIAL):
+        super().__init__(graph_layout)
+
+    def _extract(self, data):
+        if type(data) == str:
+            _file_path = data
+            data = read_pkl(data)
+        landmarks, landmarks_scores = data['landmarks'].astype(int), data['face_boxes'][:, :, 4]
+        landmarks_scores = np.array([landmarks_scores] * 68).transpose((1, 2, 0))
+        boxes = data['face_boxes'][:, :, :4].astype(int)
+        boxes = boxes.reshape(*boxes.shape[:-1], 2, 2)
+        boxes[:, :, 0] += boxes[:, :, 1] // 2
+        cids = data['child_ids'].astype(int)
+        cids[cids == 255] = -1
+        result = {'landmarks': landmarks, 'landmarks_scores': landmarks_scores, 'aus': data['aus'], 'emotions': data['emotions'],
+                  'boxes': boxes, 'face_boxes': boxes, 'rotations': data['rotations'], 'child_ids': cids,
+                  'resolution': data['resolution'], 'fps': data['fps'], 'frame_count': data['frame_count'], 'duration_seconds': data['length'],
+                  'video_path': data['video_path'], 'filename': data['filename'], 'feat_path': data['feat_path'], 'skip_frames': data['skip_frames']}
+        self._assign_labels(result, cids)
+        return result
+#np.expand_dims([kp[cid, i] for i, cid in enumerate(cids)], axis=0)

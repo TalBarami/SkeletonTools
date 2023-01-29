@@ -16,6 +16,19 @@ import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 
+class DataWrapper:
+    def __init__(self,  read_func):
+        self.read_func = read_func
+        self.data = None
+
+    def get(self):
+        if self.data is None:
+            self.data = self.read_func()
+        return self.data
+
+    def __call__(self):
+        return self.get()
+
 def scan_db(root=r'Z:\recordings', properties=False, save=None):
     prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
     db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
@@ -147,7 +160,10 @@ def get_video_properties(filename, method='ffmpeg'):
         if 'format' in vinf.keys() and 'duration' in vinf['format'].keys():
             length_candidates.append(vinf['format']['duration'])
         length = eval(length_candidates[0]) if len(length_candidates) > 0 else None
+        if length is not None and fps is not None:
+            estimated_frame = length * fps
         frame_candidates = [eval(vinf['streams'][i]['nb_frames']) for i in range(len(vinf['streams'])) if 'nb_frames' in vinf['streams'][i].keys()]
+        frame_candidates = [f for f in frame_candidates if np.abs(f - estimated_frame) < np.min((50, estimated_frame * 0.1))]
         frame_count = int(np.max(frame_candidates)) if len(frame_candidates) > 0 else int(np.ceil(length * fps)) if length and fps else None
     return resolution, fps, frame_count, length
 

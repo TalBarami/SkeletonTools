@@ -381,16 +381,15 @@ def box_distance(b1, b2):
     c2, _ = b2
     return np.linalg.norm(c1 - c2)
 
-
 def bounding_box(pose, score, epsilon=EPSILON):
-    pose, score = np.array(pose), np.array(score)
+    pose, score = np.array(pose).T, np.array(score).T
     x, y = pose[0][score > epsilon], pose[1][score > epsilon]
     if not any(x):
         x = np.array([0])
     if not any(y):
         y = np.array([0])
     w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
-    return np.array([np.min(x) + w / 2, np.min(y) + h / 2, w, h])
+    return np.array([np.min(x) + w / 2, np.min(y) + h / 2, w, h]).reshape((2, 2))
 
 
 def openpose_match(data_numpy):
