@@ -317,6 +317,7 @@ def generate_statistics(dfs, names):
         df['name'] = name
         # df.drop(df[df['video'].isin(exclude)].index, inplace=True)
     df = pd.concat(dfs)
+    df = df[df['movement'] != 'NoAction']
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-1]))
     df['child'] = df['assessment'].apply(lambda a: a.split('_')[0])
     df['length'] = df['end_time'] - df['start_time']
@@ -343,17 +344,17 @@ def generate_statistics(dfs, names):
 if __name__ == '__main__':
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
 
-    model = 'cv0_epoch_16.pth'
+    model = 'cv0.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
     generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
 
-    model = 'cv0_epoch_50.pth'
+    model = 'cv1.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
     generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
 
-    model = 'cv1_epoch_27.pth'
-    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
-    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+    model = 'cv2.pth'
+    df, summary_df, agg_df, summary_agg_df = collect_predictions(r'\\ac-s1\Data\Autism Center\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', model_name='binary_cd_epoch_37.pth')
+    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', 'binary_cd_epoch_37.pth'])
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']

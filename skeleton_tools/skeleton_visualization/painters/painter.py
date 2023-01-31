@@ -87,7 +87,7 @@ class GraphPainter(BasePainter):
 
     def _paint(self, frame, landmarks, landmarks_scores, color):
         for (v1, v2) in self.graph_layout.pairs():
-            if landmarks_scores[v1] < self.epsilon or landmarks_scores[v2] < self.epsilon:
+            if np.any(landmarks_scores < self.epsilon):
                 continue
             cv2.line(frame, tuple(landmarks[v1]), tuple(landmarks[v2]), color, thickness=self.line_thickness, lineType=cv2.LINE_AA)
         return frame
