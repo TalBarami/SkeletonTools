@@ -15,6 +15,7 @@ import numpy as np
 import cv2
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
+pd.set_option('display.expand_frame_repr', False)
 
 class DataWrapper:
     def __init__(self,  read_func):
@@ -48,6 +49,8 @@ def scan_db(root=r'Z:\recordings', properties=False, save=None):
     db['basename'] = db['filename'].apply(lambda s: osp.splitext(s)[0])
     db['assessment'] = db['basename'].apply(lambda s: '_'.join(s.split('_')[:4]))
     db['child_id'] = db['filename'].apply(lambda s: s.split('_')[0])
+    db['type'] = db['assessment'].apply(lambda s: s.split('_')[1])
+    db['date'] = db['assessment'].apply(lambda s: s.split('_')[3])
     if not properties:
         db = db[[c for c in db.columns if c not in prop_cols]]
     if save is not None:
@@ -244,3 +247,10 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
+
+if __name__ == '__main__':
+    db = scan_db()
+    asmt = db.groupby('assessment').first().reset_index()[['assessment', 'child_id', 'date', 'type']]
+    print(1)
+    db2 = scan_db(properties=True)
+    print(2)
