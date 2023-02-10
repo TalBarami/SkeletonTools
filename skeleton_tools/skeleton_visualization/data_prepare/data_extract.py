@@ -15,26 +15,17 @@ class VisualizerDataExtractor(ABC):
         self.epsilon = 1e-1
 
     @abstractmethod
-    def _extract(self, data):
+    def _extract(self, *args, **kwargs):
         pass
 
     def __call__(self, *data):
         return self._extract(*data)
 
-    def _assign_locations(self, boxes):
-        M, T = boxes.shape[:2]
-        out = np.zeros((*boxes.shape[:2], 2), dtype=np.int32)
-        for i in range(M):
-            for t in range(T):
-                (cx, cy), (w, h) = boxes[i, t]
-                out[i, t] = np.array([cx - w // 2, cy - h // 2])
-        return out
-
     def _assign_labels(self, result, cids):
         M, T = result['landmarks'].shape[:2]
         result['label_text'] = np.array([['Child' if cids[t] == i else 'Adult' for t in range(T)] for i in range(M)])
         result['colors'] = np.array([[(0, 0, 255) if cids[t] == i else (255, 0, 0) for t in range(T)] for i in range(M)])
-        result['label_location'] = self._assign_locations(result['boxes'])
+
 
 class MMPoseDataExtractor(VisualizerDataExtractor):
     def __init__(self, graph_layout=COCO_LAYOUT):
@@ -48,8 +39,7 @@ class MMPoseDataExtractor(VisualizerDataExtractor):
     def _extract(self, data, predictions):
         if type(data) == str:
             data = read_pkl(data)
-        if type(predictions) == str:
-            _predictions = np.array(read_pkl(predictions)).T[1]
+        _predictions = np.array(read_pkl(predictions)).T[1] if type(predictions) == str else predictions
         landmarks, landmarks_scores, cids = data['keypoint'], data['keypoint_score'], data['child_ids'].astype(int)
         T = landmarks.shape[1]
         predictions = np.array([_predictions[i // 30] if i // 30 < _predictions.shape[0] and i % 30 == 0 else np.nan for i in range(T)])
@@ -72,7 +62,6 @@ class PyfeatDataExtractor(VisualizerDataExtractor):
 
     def _extract(self, data):
         if type(data) == str:
-            _file_path = data
             data = read_pkl(data)
         landmarks, landmarks_scores = data['landmarks'].astype(int), data['face_boxes'][:, :, 4]
         landmarks_scores = np.array([landmarks_scores] * 68).transpose((1, 2, 0))
@@ -87,4 +76,3 @@ class PyfeatDataExtractor(VisualizerDataExtractor):
                   'video_path': data['video_path'], 'filename': data['filename'], 'feat_path': data['feat_path'], 'skip_frames': data['skip_frames']}
         self._assign_labels(result, cids)
         return result
-#np.expand_dims([kp[cid, i] for i, cid in enumerate(cids)], axis=0)

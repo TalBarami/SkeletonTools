@@ -19,7 +19,7 @@ from scipy import stats
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.skeleton_visualization.mmpose_visualizer import MMPoseVisualizer
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
-from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions
+from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare
 from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories
 
 pd.set_option('display.expand_frame_repr', False)
@@ -72,7 +72,7 @@ def bar_plot_lenghts(ax, df):
     # cmap = sns.color_palette("mako", as_cmap=True)
     prev = np.zeros(len(classes))
     # n = 255 // len(groups)
-    cmap = ['354F52', '52796F', '84A98C', 'CAD2C5']
+    cmap = ['181818', '696969', '989898', 'BEBEBE']
 
     for i, (min_len, max_len) in enumerate(groups):
         counts = [np.count_nonzero(l[(min_len < l) & (l <= max_len)]) for l in lengths]
@@ -82,8 +82,7 @@ def bar_plot_lenghts(ax, df):
     legend = [f'{min_len}s - {max_len}s' for (min_len, max_len) in groups]
     legend[-1] = f'{groups[-1][0]}s $\leq$'
     ax.legend(legend, loc='lower right', ncol=2)
-    ax.set_xlabel('Number of videos')
-    ax.set_ylabel('Class')
+    ax.set_xlabel('Number of video segments')
     # plt.savefig(f'resources/figs/{name}_videos_lengths.png', bbox_inches='tight')
     # plt.show()
 
@@ -92,7 +91,7 @@ def bar_plot_unique_children(ax, df):
     # fig, ax = plt.subplots()
     df['ckey'] = df['video'].apply(lambda s: s.split('_')[0])
     gp = df.groupby(['movement'])['ckey'].nunique().sort_values()
-    ax.barh(gp.index, gp.values / df['ckey'].nunique() * 100, color='#354F52')
+    ax.barh(gp.index, gp.values / df['ckey'].nunique() * 100, color='#696969')
     for p in ax.patches:
         width = p.get_width()
         height = p.get_height()
@@ -100,7 +99,7 @@ def bar_plot_unique_children(ax, df):
         ax.annotate(f'{int(width)}%', (x + width + 4, y + height * 0.25), ha='center')
     ax.set_xlim(0, 100)
     ax.set_xticks(ticks=np.arange(0, 101, 20), labels=[f'{i}%' for i in np.arange(0, 101, 20)])
-    ax.set_xlabel('Percentage of unique children')
+    ax.set_xlabel('Percentage of children')
     # ax.set_ylabel('Class')
     # plt.savefig(f'resources/figs/{name}_unique_children.png', bbox_inches='tight')
     # plt.show()
@@ -132,6 +131,7 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     sns.scatterplot(data=df, x='human_count', y='model_count', ax=ax)
     sns.regplot(data=df, x='human_count', y='model_count', ax=ax)
     ax.plot((0, m), (0, m))
+    ax.set(xlabel='Human actions count', ylabel='Model actions count', xlim=(0, m), ylim=(0, m))
     # plt.show()
 
 def plot_model_vs_human_rel_length(ax, df1, df2):
@@ -147,6 +147,7 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
     sns.scatterplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
     sns.regplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
     ax.plot((0, m), (0, m))
+    ax.set(xlabel='Stereotypical relative length (human)', ylabel='Stereotypical relative length (model)', xlim=(0, m), ylim=(0, m))
     # plt.show()
 
 def bland_altman(ax, df1, df2):
@@ -165,7 +166,7 @@ def bland_altman(ax, df1, df2):
     ax.axhline(0, color='green', linestyle='-')
     ax.axhline(m + 1.96 * s, color='gray', linestyle='--')
     ax.axhline(m - 1.96 * s, color='gray', linestyle='--')
-    ax.set_ylim(-4 * s, 4 * s)
+    ax.set(xlabel='Mean of human and model actions count', ylabel='Difference between human and model actions count', ylim=(-4 * s, 4 * s))
 
 
 # classmap = {0: 'Hand flapping',
@@ -290,7 +291,18 @@ def export_frames_for_figure():
         v.export_frames(vid, j, f'C:/Users/owner/Desktop/out/{name}')
 
 
-def generate_statistics(dfs, names):
+def display(f, show=False, save=None):
+    fig, ax = plt.subplots()
+    fig.set_size_inches(8, 6)
+    f(ax)
+    fig.tight_layout()
+    if save:
+        fig.savefig(f'resources/figs/{save}.png')
+    if show:
+        plt.show()
+    return fig
+
+def model_statistics(dfs, names):
     db = pd.read_csv(r'Z:\recordings\db_info.csv')
     db['video_full_name'] = db['video']
     db['video'] = db['video'].apply(lambda v: osp.splitext(v)[0])
@@ -309,7 +321,6 @@ def generate_statistics(dfs, names):
     # plt.savefig(f'resources/figs/train_statistics.png', bbox_inches='tight')
     # plt.show()
 
-    sns.set_style(style='white')
     # dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
     for df, name in zip(dfs, names):
         df['basename'] = df['video'].apply(lambda v: osp.splitext(v)[0])
@@ -325,36 +336,43 @@ def generate_statistics(dfs, names):
     #     df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
     #              axis=1,
     #              result_type="expand")
+    display(lambda ax: bar_plot_actions_count_dist(ax, df), show=True, save='actions_count_dist')
+    display(lambda ax: bar_plot_actions_length_dist(ax, df), show=True, save='actions_length_dist')
+    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_actions_count')
+    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_rel_length')
+    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='bland_altman')
 
-    def display(f):
-        fig, ax = plt.subplots()
-        fig.set_size_inches(8, 6)
-        f(ax)
-        fig.tight_layout()
-        # plt.savefig(f'resources/figs/actions_count_dist.png', bbox_inches='tight')
-        plt.show()
 
-    display(lambda ax: bar_plot_actions_count_dist(ax, df))
-    display(lambda ax: bar_plot_actions_length_dist(ax, df))
-    # plt.savefig(f'resources/figs/mean_length_dist.png', bbox_inches='tight')
-    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
-    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
-    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']))
+def data_statistics(_df):
+    _df.loc[_df[_df['movement'].isna()].index, 'movement'] = 'Other'
+    df = pd.DataFrame(columns=_df.columns)
+    for i, row in _df.iterrows():
+        movements = row['movement'].split(',')
+        for m in movements:
+            rc = row.copy()
+            rc['movement'] = m
+            df.loc[df.shape[0]] = rc
+    display(lambda ax: bar_plot_lenghts(ax, df), show=True, save='data_stats')
+    display(lambda ax: bar_plot_unique_children(ax, df), show=True, save='children_stats')
+
 
 if __name__ == '__main__':
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
+    sns.set_style(style='white')
+    human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
+    data_statistics(human)
 
     model = 'cv0.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
-    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+    model_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
 
-    model = 'cv1.pth'
-    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
-    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
-
-    model = 'cv2.pth'
-    df, summary_df, agg_df, summary_agg_df = collect_predictions(r'\\ac-s1\Data\Autism Center\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', model_name='binary_cd_epoch_37.pth')
-    generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', 'binary_cd_epoch_37.pth'])
+    # model = 'cv1.pth'
+    # df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
+    # generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+    #
+    # model = 'cv2.pth'
+    # df, summary_df, agg_df, summary_agg_df = collect_predictions(r'\\ac-s1\Data\Autism Center\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', model_name='binary_cd_epoch_37.pth')
+    # generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', 'binary_cd_epoch_37.pth'])
 
     # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
     # label = df['y']
