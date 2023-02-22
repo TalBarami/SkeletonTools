@@ -1,5 +1,6 @@
 import matplotlib.colors as mcolors
 from os import path as osp
+import pandas as pd
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
 from skeleton_tools.openpose_layouts.face import FACE_LAYOUT
@@ -38,3 +39,4 @@ LENGTH = 200
 MIN_LENGTH = 60
 STEP_SIZE = 30
 EPSILON = 1e-4
+pd.options.display.max_columns = 99

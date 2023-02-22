@@ -136,7 +136,7 @@ def evaluate(df, ground_truth, key='frame'):
 def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
     init_directories(out_path)
     dfs = pd.concat([pd.read_csv(p) for p in score_files])
-    thresholds = np.round(np.arange(0.35, 1, 0.05), 3)
+    thresholds = np.round(np.arange(0.5, 1.01, 0.05), 3)
     a, p, r = [], [], []
     for t in thresholds:
         print(f'Threshold: {t}')

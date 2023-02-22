@@ -24,6 +24,7 @@ from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_dire
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
+sns.set(font_scale=1.2)
 
 def plot_fft(data_numpy, title, filename):
     C, J, N = data_numpy.shape
@@ -58,7 +59,7 @@ def plot_fft(data_numpy, title, filename):
             axs[1].axvline(7, color='r')
             axs[1].axvline(20, color='r')
     dst_path = r'D:\datasets\autism_center\fftfigs'
-    fig.savefig(osp.join(dst_path, f'{filename}.png'), dpi=100)
+    fig.savefig(osp.join(dst_path, f'{filename}.png'), dpi=240)
     # plt.show()
 
 
@@ -96,30 +97,23 @@ def bar_plot_unique_children(ax, df):
         width = p.get_width()
         height = p.get_height()
         x, y = p.get_xy()
-        ax.annotate(f'{int(width)}%', (x + width + 4, y + height * 0.25), ha='center')
+        ax.annotate(f'{int(width)}%', (x + width + 5.5, y + height * 0.1), ha='center')
     ax.set_xlim(0, 100)
     ax.set_xticks(ticks=np.arange(0, 101, 20), labels=[f'{i}%' for i in np.arange(0, 101, 20)])
     ax.set_xlabel('Percentage of children')
-    # ax.set_ylabel('Class')
-    # plt.savefig(f'resources/figs/{name}_unique_children.png', bbox_inches='tight')
-    # plt.show()
 
 def bar_plot_actions_count_dist(ax, df):
-    gp = df.groupby(['assessment', 'name']).agg({'video': 'count'}).reset_index()
+    gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
-    sns.histplot(data=gp, x='video', hue='name', multiple='dodge')
+    sns.histplot(data=gp, x='video', hue='legend', multiple='dodge')
     ax.set(xlabel='Actions count', ylabel='Assessments count')
-    # plt.savefig(f'resources/figs/actions_count_hist.png', bbox_inches='tight')
-    # plt.show()
 
 def bar_plot_actions_length_dist(ax, df):
-    gp = df.groupby(['assessment', 'name']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
+    gp = df.groupby(['assessment', 'legend']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
     gp['rel_length'] = gp['length'] / gp['length_seconds']
-    sns.histplot(data=gp, x='rel_length', hue='name', multiple='dodge')
+    sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
-    # plt.savefig(f'resources/figs/length_hist.png', bbox_inches='tight')
-    # plt.show()
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
     g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
@@ -132,7 +126,6 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     sns.regplot(data=df, x='human_count', y='model_count', ax=ax)
     ax.plot((0, m), (0, m))
     ax.set(xlabel='Human actions count', ylabel='Model actions count', xlim=(0, m), ylim=(0, m))
-    # plt.show()
 
 def plot_model_vs_human_rel_length(ax, df1, df2):
     gp = []
@@ -148,7 +141,6 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
     sns.regplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
     ax.plot((0, m), (0, m))
     ax.set(xlabel='Stereotypical relative length (human)', ylabel='Stereotypical relative length (model)', xlim=(0, m), ylim=(0, m))
-    # plt.show()
 
 def bland_altman(ax, df1, df2):
     g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
@@ -297,7 +289,7 @@ def display(f, show=False, save=None):
     f(ax)
     fig.tight_layout()
     if save:
-        fig.savefig(f'resources/figs/{save}.png')
+        fig.savefig(f'resources/figs/{save}.png', dpi=240)
     if show:
         plt.show()
     return fig
@@ -322,6 +314,7 @@ def model_statistics(dfs, names):
     # plt.show()
 
     # dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
+    legend = {'Human': 'Human', 'cv0.pth': 'Model'}
     for df, name in zip(dfs, names):
         df['basename'] = df['video'].apply(lambda v: osp.splitext(v)[0])
         df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
@@ -332,6 +325,8 @@ def model_statistics(dfs, names):
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-1]))
     df['child'] = df['assessment'].apply(lambda a: a.split('_')[0])
     df['length'] = df['end_time'] - df['start_time']
+    df['legend'] = df['name'].apply(lambda n: legend[n])
+
     # df[['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']] = \
     #     df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
     #              axis=1,

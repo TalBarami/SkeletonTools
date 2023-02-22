@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
 
 from skeleton_tools.utils.constants import EPSILON
 
@@ -31,3 +32,10 @@ def blur_area(frame, center, radius):
     mask2 = cv2.bitwise_and(blur, blur, mask=c_mask)  # mask
     final_img = img_mask + mask2
     return final_img
+
+def fig2np(fig):
+    fig.canvas.draw()
+    frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    frame = frame.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    plt.close(fig)
+    return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
