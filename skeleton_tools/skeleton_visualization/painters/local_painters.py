@@ -45,13 +45,14 @@ class GraphPainter(LocalPainter):
 
 
 class TextPainter(LocalPainter, ABC):
-    def __init__(self, alpha=1.0):
+    def __init__(self, alpha=1.0, scale=1.0):
         super().__init__(alpha=alpha)
+        self.scale = scale
 
     def _paint(self, frame, loc, text, color):
         if type(text) in [float, np.float32, np.float64, int, np.int32, np.int64]:
             text = f'{text:.3f}'
-        cv2.putText(frame, text, loc.astype(np.int32), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+        cv2.putText(frame, text, loc.astype(np.int32), cv2.FONT_HERSHEY_SIMPLEX, 1.5 * self.scale, color, int(2 * self.scale), cv2.LINE_AA)
         return frame
 
 
@@ -63,16 +64,24 @@ class LabelPainter(TextPainter):
 
 
 class PersonIdentityPainter(TextPainter):
+    def __init__(self):
+        super().__init__()
+        self.offset = lambda: int(120 * self.scale)
+
     def _get(self, data, frame_id, person_id):
         (cx, cy), (w, h) = data['face_boxes'][person_id, frame_id]
-        loc = np.array([cx + w // 2 + 120, cy - h // 2])
+        loc = np.array([cx + w // 2 + self.offset(), cy - h // 2])
         return loc, data['person_id'][person_id, frame_id], self._get_color(data, frame_id, person_id)
 
 
 class ScorePainter(TextPainter):
+    def __init__(self):
+        super().__init__()
+        self.offset = lambda: int(120 * self.scale)
+
     def _get(self, data, frame_id, person_id):
         (cx, cy), (w, h) = data['face_boxes'][person_id, frame_id]
-        loc = np.array([cx - w // 2 + 120, cy - h // 2])
+        loc = np.array([cx - w // 2 + self.offset(), cy - h // 2])
         return loc, data['landmarks_scores'][person_id, frame_id].mean(), self._get_color(data, frame_id, person_id)
 
 

@@ -1,11 +1,10 @@
 import os
 from os import path as osp
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-
-from skeleton_tools.utils.constants import NET_NAME, REMOTE_STORAGE, DB_PATH
+from skeleton_tools.utils.constants import NET_NAME, DB_PATH
 from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json
 
 pd.set_option('display.expand_frame_repr', False)
@@ -255,7 +254,7 @@ def collect_labels(root, model_name, file_extension='annotations', out=None):
     dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
     df = pd.concat(dfs)
     df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-    df['child_id'] = df['assessment'].apply(lambda s: s.split('_')[0]).astype(int)
+    df['child_id'] = df['assessment'].apply(lambda s: s.split('_')[0])
     df = df.sort_values(by=['assessment', 'start_time'])
     if out:
         df.to_csv(out, index=False)

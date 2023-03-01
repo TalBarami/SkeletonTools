@@ -24,7 +24,7 @@ class VisualizerDataExtractor(ABC):
     def _assign_labels(self, result, cids):
         M, T = result['landmarks'].shape[:2]
         result['label_text'] = np.array([['Child' if cids[t] == i else 'Adult' for t in range(T)] for i in range(M)])
-        result['colors'] = np.array([[(0, 0, 255) if cids[t] == i else (255, 0, 0) for t in range(T)] for i in range(M)])
+        result['colors'] = np.array([[(255, 0, 0) if cids[t] == i else (0, 0, 255) for t in range(T)] for i in range(M)])
 
 
 class MMPoseDataExtractor(VisualizerDataExtractor):
