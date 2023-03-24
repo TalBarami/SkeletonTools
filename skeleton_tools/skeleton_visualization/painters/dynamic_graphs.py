@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import _pylab_helpers
+from scipy.signal import savgol_filter
 
 from skeleton_tools.skeleton_visualization.painters.local_painters import GraphPainter
 from skeleton_tools.skeleton_visualization.painters.paint_utils import fig2np
@@ -13,9 +14,9 @@ from skeleton_tools.skeleton_visualization.painters.paint_utils import fig2np
 plt.rcParams.update({'font.size': 10})
 
 class DynamicGraph(ABC):
-    def __init__(self, data, height, filters, dpi):
-        self._data = data.copy()
-        self.width, self.height = int(1.5 * height), height
+    def __init__(self, data, height, width, filters, dpi):
+        self.data = data
+        self.width, self.height = int(1.5 * height) if width is None else width, height
         self.filters = filters
         self.dpi = dpi
         for f in filters:
@@ -32,13 +33,13 @@ class DynamicGraph(ABC):
         pass
 
 class DynamicSignal(DynamicGraph):
-    def __init__(self, title, data, legend, xlabel, ylabel, window_size, height, filters=(), dpi=128):
+    def __init__(self, title, data, legend, xlabel, ylabel, window_size, height, width=None, filters=(), dpi=128):
         self.title, self.legend, self.xlabel, self.ylabel = title, legend, xlabel, ylabel
         self.window_size = window_size
         self.radius = self.window_size // 2
         self.ticks = 50
         pad = np.zeros((self.radius, data.shape[1]))
-        super().__init__(data=np.concatenate((pad, data, pad), axis=0), height=height, filters=filters, dpi=dpi)
+        super().__init__(data=np.concatenate((pad, data, pad), axis=0), height=height, width=width, filters=filters, dpi=dpi)
 
     def plot(self, i):
         fig, ax = plt.subplots(figsize=(self.width / self.dpi, self.height / self.dpi), dpi=self.dpi)
@@ -55,7 +56,7 @@ class DynamicSignal(DynamicGraph):
 
 class DynamicBar(DynamicGraph):
     def __init__(self, title, data, legend, xlabel, ylabel, height, filters=(), dpi=128):
-        super().__init__(data=data, height=height, filters=filters, dpi=dpi)
+        super().__init__(data=data.copy(), height=height, filters=filters, dpi=dpi)
         self.title, self.legend, self.xlabel, self.ylabel = title, legend, xlabel, ylabel
 
     def plot(self, i):
@@ -66,9 +67,17 @@ class DynamicBar(DynamicGraph):
         ax.grid()
         return fig2np(fig)
 
+def interpolate(x):
+    nans, y = np.isnan(x), lambda z: z.nonzero()[0]
+    x[nans] = np.interp(y(nans), y(~nans), x[~nans])
+    x = savgol_filter(x, 31, 3, axis=0)
+    if len(x.shape) == 1:
+        x = np.expand_dims(x, 1)
+    return x
+
 class DynamicPolar(DynamicGraph):
     def __init__(self, title, data, legend, height, filters=(), dpi=128):
-        super().__init__(data=data, height=height, filters=filters, dpi=dpi)
+        super().__init__(data=interpolate(data), height=height, filters=filters, dpi=dpi)
         self.title, self.legend = title, legend
     def plot(self, i):
         fig, ax = plt.subplots(figsize=(self.width / self.dpi, self.height / self.dpi), dpi=self.dpi, subplot_kw=dict(polar=True))
@@ -80,9 +89,9 @@ class DynamicPolar(DynamicGraph):
         return fig2np(fig)
 
 class DynamicSkeleton:
-    def __init__(self, data, height, layout, epsilon):
+    def __init__(self, data, height, layout, epsilon, width=None):
         self.painter = GraphPainter(layout, epsilon)
-        self.width, self.height = int(1.5 * height), height
+        self.width, self.height = int(1.5 * height) if width is None else width, height
         landmarks = data['landmarks'].copy()
         (w, h) = data['resolution']
         landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.width / w

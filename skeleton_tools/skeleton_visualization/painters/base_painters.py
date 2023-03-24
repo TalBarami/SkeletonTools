@@ -46,7 +46,7 @@ class LocalPainter(BasePainter):
 
     def _get_color(self, data, frame_id, person_id):
         color = tuple(int(c) for c in data['colors'][person_id, frame_id])
-        return color
+        return color[::-1]
 
 
 class BlurPainter(GlobalPainter):

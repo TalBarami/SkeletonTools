@@ -36,18 +36,24 @@ class MMPoseDataExtractor(VisualizerDataExtractor):
         boxes = np.array([[bounding_box(landmarks[i, t], landmarks_scores[i, t]) for t in range(T)] for i in range(M)])
         return boxes
 
-    def _extract(self, data, predictions):
+    def _extract(self, data, scores=None):
         if type(data) == str:
             data = read_pkl(data)
-        _predictions = np.array(read_pkl(predictions)).T[1] if type(predictions) == str else predictions
         landmarks, landmarks_scores, cids = data['keypoint'], data['keypoint_score'], data['child_ids'].astype(int)
         T = landmarks.shape[1]
-        predictions = np.array([_predictions[i // 30] if i // 30 < _predictions.shape[0] and i % 30 == 0 else np.nan for i in range(T)])
-        predictions = np.expand_dims(pd.Series(predictions).interpolate(method='polynomial', order=2, limit_direction='both').fillna(method='ffill').values, axis=1)
+        if scores is not None:
+            df = pd.read_csv(scores) if type(scores) == str else scores
+            df['frame'] = (df['start_frame'] + df['end_frame']) // 2
+            df.set_index('frame', inplace=True)
+            _scores = df['stereotypical_score']
+            scores = np.array([_scores.loc[i] if i in df.index else np.nan for i in range(T)])
+            scores = np.expand_dims(pd.Series(scores).interpolate(method='polynomial', order=2, limit_direction='both').fillna(method='ffill').fillna(0).values, axis=1)
+        else:
+            scores = np.zeros((T, 1))
         result = {'landmarks': landmarks.astype(int), 'landmarks_scores': landmarks_scores,
                   'resolution': np.array(data['img_shape']).astype(int), 'fps': data['fps'], 'frame_count': data['total_frames'], 'duration_seconds': data['length_seconds'],
                   'video_path': data['video_path'], 'filename': data['frame_dir'],
-                  'child_ids': cids, 'child_detection_scores': data['child_detected'], 'predictions': predictions}
+                  'child_ids': cids, 'child_detection_scores': data['child_detected'], 'predictions': scores}
 
         face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in self.graph_layout.face_joints()])]
         result['boxes'] = self._gen_boxes(landmarks, landmarks_scores).astype(int)

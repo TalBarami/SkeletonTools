@@ -1,3 +1,5 @@
+from argparse import ArgumentParser
+
 import cv2
 import numpy as np
 import pandas as pd
@@ -27,9 +29,11 @@ class VideoCreator:
         self.graphs = graphs
 
     def process_frame(self, frame, video_data, i):
+        M, T = video_data['landmarks'].shape[:2]
+        if i >= T:
+            return frame
         paint_frame = frame.copy()
         try:
-            M = video_data['landmarks'].shape[0]
             for painter in self.global_painters:
                 paint_frame = painter(paint_frame, video_data, i)
             for painter in self.local_painters:
@@ -81,19 +85,6 @@ class VideoCreator:
         self._create(video_path, video_data, writer, start, end, unit)
 
 
-
-
-
-# def interpolate(x, scores, drop=None):
-#     nans, y = np.isnan(x), lambda z: z.nonzero()[0]
-#     x[nans] = np.interp(y(nans), y(~nans), x[~nans])
-#     x = savgol_filter(x, 51, 3, axis=0)
-#     if drop is not None:
-#         x[scores < drop] = np.nan
-#     if len(x.shape) == 1:
-#         x = np.expand_dims(x, 1)
-#     return x
-
 def interpolate(seq):
     n = seq.shape[1]
     df = pd.DataFrame(seq)
@@ -106,12 +97,11 @@ def interpolate(seq):
     interpolated['interpolated'] = df.apply(lambda row: 1 if row.isna().any() else 0, axis=1)
     return interpolated[[x for x in range(n)]].to_numpy()
 
-def create_barni(video_name, start=None, end=None):
-    vids_dir = r'Z:\Users\Liora\Project 1 - Video recorsings for analyses'
-    barni_dir = r'Z:\Users\TalBarami\BARNI\skip_frames=1'
-    out_dir = r'Z:\Users\TalBarami\BARNI\skip_frames=1\videos'
+
+def create_barni(video_path, pkl_path, out_path, start=None, end=None):
+    _, ext = osp.splitext(video_path)
     extractor = PyfeatDataExtractor(PYFEAT_FACIAL)
-    data = extractor(osp.join(barni_dir, video_name, 'barni', f'{video_name}.pkl'))
+    data = extractor(pkl_path)
     child_face_score = np.array([data['landmarks_scores'][c, i] for i, c in enumerate(data['child_ids'])]).T[0]
     child_aus = np.array([data['aus'][c, i] for i, c in enumerate(data['child_ids'])])
     child_emotions = np.array([data['emotions'][c, i] for i, c in enumerate(data['child_ids'])])
@@ -124,69 +114,74 @@ def create_barni(video_name, start=None, end=None):
 
     local_painters = [GraphPainter(extractor.graph_layout, epsilon=t, alpha=0.4), LabelPainter(), ScorePainter(), BoxPainter()]
     global_painters = [GlobalPainter(p) for p in local_painters]
-    # global_painters = [BlurPainter(data['face_boxes'])] + [GlobalPainter(p) for p in local_painters]
     graphs = [DynamicPolar('AUs', child_aus, AU_COLS, int(data['resolution'][1] * 0.5), filters=()),
               DynamicSignal('Emotions', child_emotions, EMOTION_COLS,
                             'Time', 'Score',
                             window_size=1000,
                             height=int(data['resolution'][1] * 0.5),
                             filters=())]
-    # graphs = [DynamicPolar('AUs', interpolate(child_aus, child_face_score), AU_COLS, int(data['resolution'][1] * 0.5), filters=()),
-    #           DynamicSignal('Emotions', interpolate(child_emotions, child_face_score), EMOTION_COLS,
-    #                         'Time', 'Score',
-    #                         window_size=np.round(np.max((200, data['landmarks'].shape[1] * 0.01)), -2).astype(int),
-    #                         height=int(data['resolution'][1] * 0.5),
-    #                         filters=())]
     vc = VideoCreator(global_painters=global_painters, local_painters=[], graphs=graphs)
-    vc.create_video(osp.join(vids_dir, f'{video_name}.mp4'),
-                    data,
-                    osp.join(out_dir, f'{video_name}_{start}-{end}.mp4'), start=start, end=end, unit='time')
+    vc.create_video(video_path, data, out_path, start=start, end=end, unit='time')
 
-def create_jordi(video_name, start=None, end=None):
-    jordi_dir = r'Z:\Users\TalBarami\jordi_cross_validation'
-    out_dir = r'Z:\Users\TalBarami\vids'
+
+def create_jordi(video_path, skeleton_path, predictions_path, out_path, start=None, end=None):
     extractor = MMPoseDataExtractor(COCO_LAYOUT)
-    model = [m for m in os.listdir(osp.join(jordi_dir, video_name, 'jordi')) if osp.isdir(osp.join(jordi_dir, video_name, 'jordi', m)) and 'cv' in m][0]
-    data = extractor(osp.join(jordi_dir, video_name, 'jordi', f'{video_name}.pkl'),
-                     osp.join(jordi_dir, video_name, 'jordi', model, f'{video_name}_predictions.pkl'))
-    video_path = data['video_path']
-    predictions = np.expand_dims(shift(data['predictions'].squeeze(), 100), 1)
+    data = extractor(skeleton_path, predictions_path)
+    width, height = data['resolution']
     epsilon = 0.3
     local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4), LabelPainter(), ScorePainter(), BoxPainter()]
     global_painters = [GlobalPainter(p) for p in local_painters]
-    # global_painters = [BlurPainter(data['face_boxes'])] + [GlobalPainter(p) for p in local_painters]
-    graphs = [DynamicSignal('Stereotypical Action', predictions, ['Stereotypical'],
+    graphs = [DynamicSignal('Stereotypical Action', data['predictions'], ['Stereotypical'],
                             'Time', 'Score',
                             window_size=1000,
-                            height=int(data['resolution'][1] * 0.5),
+                            height=int(height * 0.5),
+                            width=width,
                             filters=()),
-              DynamicSkeleton(layout=extractor.graph_layout, epsilon=epsilon, data=data, height=int(data['resolution'][1] * 0.5))]
+              DynamicSkeleton(layout=extractor.graph_layout, epsilon=epsilon, data=data,
+                              height=int(height * 0.5), width=width)]
 
     vc = VideoCreator(global_painters=global_painters, local_painters=[], graphs=graphs)
-    vc.create_video(video_path,
-                    data,
-                    osp.join(out_dir, f'{video_name}_{start}-{end}.mp4'), start=start, end=end, unit='frame')
+    vc.create_video(video_path, data, out_path, start=start, end=end, unit='frame')
 
 if __name__ == '__main__':
-    for v in ['1032323269_ADOS_Control_050123_1625_1',
-              '673168102_ADOS_Clinical_040221_0926_2',
-              '1032482908_ADOS_Clinical_310122_1057_1',
-              '675793378_ADOS_Clinical_051021_0839_4',
-              '1020232399_ADOS_310718_0922_4_Trim',
-              '666808807_ADOS_Clinical_120218_1300_4',
-              '675883867_ADOS_Clinical_150920_1249_2_Trim']:
-        try:
-            create_barni(v)
-        except Exception as e:
-            print(f"Failed to create video for {v}: {e}")
-            print(traceback.format_exc())
+    parser = ArgumentParser()
+    parser.add_argument("-video", "--video_path")
+    parser.add_argument("-pkl", "--pkl_path")
+    parser.add_argument("-pkl_pred", "--pkl_predictions_path")
+    parser.add_argument("-out", "--out_dir")
+    parser.add_argument("-start", "--start")
+    parser.add_argument("-end", "--end")
+    parser.add_argument('-j', '--jordi', action='store_true')
+    parser.add_argument('-b', '--barni', action='store_true')
+    args = parser.parse_args()
+
+    name, ext = osp.splitext(osp.basename(args.video_path))
+    if args.jordi:
+        create_jordi(args.video_path, args.pkl_path, args.pkl_predictions_path, osp.join(args.out_dir, f'{name}_SMMs_{args.start}_{args.end}.mp4'), args.start, args.end)
+    if args.barni:
+        create_barni(args.video_path, args.pkl_path, osp.join(args.out_dir, f'{name}_Facial_{args.start}_{args.end}.mp4'), args.start, args.end)
+
+    # for v in ['Tamar_dinstein_cognitive',
+    #           '1032323269_ADOS_Control_050123_1625_1',
+    #           '673168102_ADOS_Clinical_040221_0926_2',
+    #           '1032482908_ADOS_Clinical_310122_1057_1',
+    #           '675793378_ADOS_Clinical_051021_0839_4',
+    #           '1020232399_ADOS_310718_0922_4_Trim',
+    #           '666808807_ADOS_Clinical_120218_1300_4',
+    #           '675883867_ADOS_Clinical_150920_1249_2_Trim']:
+    #     try:
+    #         create_barni(v)
+    #         break
+    #     except Exception as e:
+    #         print(f"Failed to create video for {v}: {e}")
+    #         print(traceback.format_exc())
 
     # create_barni('673950985_ADOS_ASD_061019_1038_4_Trim', start=1127, end=1155)
     # create_barni('673950985_ADOS_ASD_061019_1038_4_Trim', start=1058, end=1076)
     # create_jordi('666770197_Cognitive_Clinical_010120_1127_3')
     # create_jordi('1007196724_ADOS_Clinical_190917_0000_2')
 
-    create_jordi('1018226485_ADOS_Control_210119_0929_4') # Tamar
+    # create_jordi('1018226485_ADOS_Control_210119_0929_4') # Tamar
 
     # video_name = r'666770197_Cognitive_Clinical_010120_1127_3'
     # jordi_dir = r'Z:\Users\TalBarami\jordi_cross_validation'
