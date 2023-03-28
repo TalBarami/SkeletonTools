@@ -55,8 +55,10 @@ class VideoCreator:
         if unit == 'time':
             start, end = int(start * fps), int(end * fps)
         cap = cv2.VideoCapture(video_path)
-        if start > 0:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        i = 0
+        while i < start:
+            _, _ = cap.read()
+            i += 1
 
         # for i in tqdm(range(start, end), desc="Writing video result"):
         #     ret, frame = cap.read()
@@ -149,8 +151,8 @@ if __name__ == '__main__':
     parser.add_argument("-pkl", "--pkl_path")
     parser.add_argument("-pkl_pred", "--pkl_predictions_path")
     parser.add_argument("-out", "--out_dir")
-    parser.add_argument("-start", "--start")
-    parser.add_argument("-end", "--end")
+    parser.add_argument("-s", "--start")
+    parser.add_argument("-t", "--end")
     parser.add_argument('-j', '--jordi', action='store_true')
     parser.add_argument('-b', '--barni', action='store_true')
     args = parser.parse_args()

@@ -9,8 +9,8 @@ from skeleton_tools.skeleton_visualization.painters.base_painters import LocalPa
 
 
 class BoxPainter(LocalPainter):
-    def __init__(self, alpha=1.0):
-        super().__init__(alpha=alpha)
+    def __init__(self, alpha=1.0, auto_color=None):
+        super().__init__(alpha=alpha, auto_color=auto_color)
 
     def _paint(self, frame, bbox, color):
         c, r = bbox
@@ -23,8 +23,8 @@ class BoxPainter(LocalPainter):
 
 
 class GraphPainter(LocalPainter):
-    def __init__(self, graph_layout, epsilon=1e-1, line_thickness=3, alpha=1.0):
-        super().__init__(alpha=alpha)
+    def __init__(self, graph_layout, epsilon=1e-1, line_thickness=3, alpha=1.0, auto_color=None):
+        super().__init__(alpha=alpha, auto_color=auto_color)
         self.graph_layout = graph_layout
         self.epsilon = epsilon
         self.line_thickness = line_thickness
@@ -45,8 +45,8 @@ class GraphPainter(LocalPainter):
 
 
 class TextPainter(LocalPainter, ABC):
-    def __init__(self, alpha=1.0, scale=1.0):
-        super().__init__(alpha=alpha)
+    def __init__(self, alpha=1.0, auto_color=None, scale=1.0):
+        super().__init__(alpha=alpha, auto_color=auto_color)
         self.scale = scale
 
     def _paint(self, frame, loc, text, color):
@@ -64,8 +64,8 @@ class LabelPainter(TextPainter):
 
 
 class PersonIdentityPainter(TextPainter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, auto_color=None):
+        super().__init__(auto_color=auto_color)
         self.offset = lambda: int(120 * self.scale)
 
     def _get(self, data, frame_id, person_id):
@@ -75,8 +75,8 @@ class PersonIdentityPainter(TextPainter):
 
 
 class ScorePainter(TextPainter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, auto_color=None):
+        super().__init__(auto_color=auto_color)
         self.offset = lambda: int(120 * self.scale)
 
     def _get(self, data, frame_id, person_id):

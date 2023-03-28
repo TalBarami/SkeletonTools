@@ -30,7 +30,9 @@ class DataWrapper:
     def __call__(self):
         return self.get()
 
-def scan_db(root=r'Z:\recordings', properties=False, save=None):
+def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
+    if load_from is not None and osp.exists(load_from):
+        return pd.read_csv(load_from)
     prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
     db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
     for r, d, fs in os.walk(root):
@@ -53,8 +55,8 @@ def scan_db(root=r'Z:\recordings', properties=False, save=None):
     db['date'] = db['assessment'].apply(lambda s: s.split('_')[3])
     if not properties:
         db = db[[c for c in db.columns if c not in prop_cols]]
-    if save is not None:
-        db.to_csv(save, index=False)
+    if load_from is not None:
+        db.to_csv(load_from, index=False)
     return db
 
 def create_config(dict_conf, out=None):
