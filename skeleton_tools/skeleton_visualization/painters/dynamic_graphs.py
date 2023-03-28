@@ -94,7 +94,8 @@ class DynamicSkeleton:
         self.width, self.height = int(1.5 * height) if width is None else width, height
         landmarks = data['landmarks'].copy()
         (w, h) = data['resolution']
-        landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.width / w
+        self.scaled_width = int(self.width * w / h)
+        landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.scaled_width / w
         landmarks[:, :, :, 1] = landmarks[:, :, :, 1] * self.height / h
         self.m = landmarks.shape[0]
         self.data = {
@@ -105,8 +106,10 @@ class DynamicSkeleton:
 
     def plot(self, i):
         frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        d = self.width - self.scaled_width
         for j in range(self.m):
-            frame = self.painter(frame, self.data, i, j)
+            frame[:, d//2:d//2+self.scaled_width] = self.painter(frame[:, d//2:d//2+self.scaled_width], self.data, i, j)
+            # frame = self.painter(frame, self.data, i, j)
         return frame
 
     def __call__(self, i):
