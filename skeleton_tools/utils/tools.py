@@ -31,8 +31,10 @@ class DataWrapper:
         return self.get()
 
 def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
+    if load_from is None:
+        load_from = osp.join(REMOTE_STORAGE, 'recordings', 'db.csv')
     prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
-    if load_from is not None and osp.exists(load_from):
+    if osp.exists(load_from):
         db = pd.read_csv(load_from)
     else:
         db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
@@ -43,12 +45,12 @@ def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
         for f in fs:
             if f.lower().endswith('.mp4') or f.lower().endswith('.avi'):
                 try:
-                    if f not in db['filename'].values:
-                        if properties:
-                            (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
+                    if properties:
+                        if f in db['filename'].unique():
+                            width, height, fps, frame_count, length_seconds = df.loc[df['filename'] == f, prop_cols].values[0]
                         else:
-                            (width, height), fps, frame_count, length_seconds = (None, None), None, None, None
-                        db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
+                            (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
+                    db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
                 except Exception as e:
                     print(f'Error extracting information from {f}.')
     db['basename'] = db['filename'].apply(lambda s: osp.splitext(s)[0])
@@ -58,8 +60,7 @@ def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
     db['date'] = db['assessment'].apply(lambda s: s.split('_')[3])
     if not properties:
         db = db[[c for c in db.columns if c not in prop_cols]]
-    if load_from is not None:
-        db.to_csv(load_from, index=False)
+    db.to_csv(load_from, index=False)
     return db
 
 def create_config(dict_conf, out=None):
