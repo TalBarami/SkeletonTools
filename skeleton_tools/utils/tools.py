@@ -31,21 +31,24 @@ class DataWrapper:
         return self.get()
 
 def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
-    if load_from is not None and osp.exists(load_from):
-        return pd.read_csv(load_from)
     prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
-    db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
+    if load_from is not None and osp.exists(load_from):
+        db = pd.read_csv(load_from)
+    else:
+        db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
+
     for r, d, fs in os.walk(root):
         if 'Asaf' in r or 'Face camera' in r:
             continue
         for f in fs:
             if f.lower().endswith('.mp4') or f.lower().endswith('.avi'):
                 try:
-                    if properties:
-                        (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
-                    else:
-                        (width, height), fps, frame_count, length_seconds = (None, None), None, None, None
-                    db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
+                    if f not in db['filename'].values:
+                        if properties:
+                            (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
+                        else:
+                            (width, height), fps, frame_count, length_seconds = (None, None), None, None, None
+                        db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
                 except Exception as e:
                     print(f'Error extracting information from {f}.')
     db['basename'] = db['filename'].apply(lambda s: osp.splitext(s)[0])
