@@ -30,26 +30,24 @@ class DataWrapper:
     def __call__(self):
         return self.get()
 
-def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
-    if load_from is None:
-        load_from = osp.join(REMOTE_STORAGE, 'recordings', 'db.csv')
-    prop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds']
+def scan_db(root=r'Z:\recordings', reload=True):
+    load_from = osp.join(REMOTE_STORAGE, 'recordings', 'db.csv')
     if osp.exists(load_from):
         db = pd.read_csv(load_from)
+        if not reload:
+            return db
     else:
-        db = pd.DataFrame(columns=['filename', 'file_path'] + prop_cols)
+        db = pd.DataFrame(columns=['filename', 'file_path', 'width', 'height', 'fps', 'frame_count', 'length_seconds'])
 
     for r, d, fs in os.walk(root):
         if 'Asaf' in r or 'Face camera' in r:
             continue
         for f in fs:
+            if f in db['filename'].unique():
+                continue
             if f.lower().endswith('.mp4') or f.lower().endswith('.avi'):
                 try:
-                    if properties:
-                        if f in db['filename'].unique():
-                            width, height, fps, frame_count, length_seconds = df.loc[df['filename'] == f, prop_cols].values[0]
-                        else:
-                            (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
+                    (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
                     db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
                 except Exception as e:
                     print(f'Error extracting information from {f}.')
@@ -58,8 +56,6 @@ def scan_db(root=r'Z:\recordings', properties=False, load_from=None):
     db['child_id'] = db['filename'].apply(lambda s: s.split('_')[0])
     db['type'] = db['assessment'].apply(lambda s: s.split('_')[1])
     db['date'] = db['assessment'].apply(lambda s: s.split('_')[3])
-    if not properties:
-        db = db[[c for c in db.columns if c not in prop_cols]]
     db.to_csv(load_from, index=False)
     return db
 
@@ -149,13 +145,8 @@ def take_subclip(video_path, start_time, end_time, fps, out_path):
 
 
 def get_video_properties(filename, method='ffmpeg'):
-    if method == 'cv2':
-        cap = cv2.VideoCapture(filename)
-        resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        length = frame_count / fps
-    else:
+
+    try:
         vinf = ffmpeg.probe(filename)
 
         resolution_candidates = [(vinf['streams'][i]['width'], vinf['streams'][i]['height']) for i in range(len(vinf['streams'])) if 'width' in vinf['streams'][i].keys() and 'height' in vinf['streams'][i].keys()]
@@ -174,6 +165,17 @@ def get_video_properties(filename, method='ffmpeg'):
         frame_candidates = [eval(vinf['streams'][i]['nb_frames']) for i in range(len(vinf['streams'])) if 'nb_frames' in vinf['streams'][i].keys()]
         frame_candidates = [f for f in frame_candidates if np.abs(f - estimated_frame) < np.min((50, estimated_frame * 0.1))]
         frame_count = int(np.max(frame_candidates)) if len(frame_candidates) > 0 else int(np.ceil(length * fps)) if length and fps else None
+    except Exception:
+        try:
+            cap = cv2.VideoCapture(filename)
+            resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            length = frame_count / fps
+        except Exception as e:
+            raise e
+        finally:
+            cap.release()
     return resolution, fps, frame_count, length
 
 

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from skeleton_tools.utils.constants import NET_NAME, DB_PATH
-from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json
+from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json, scan_db
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -286,7 +286,7 @@ def collect_predictions(predictions_dir, experiment_name=None, out_dir=None, mod
 def prepare(df, remove_noact=False):
     if remove_noact:
         df = df[df['movement'] != 'NoAction']
-    db = pd.read_csv(DB_PATH)
+    db = scan_db()
     df['annotator'] = df['annotator'].apply(lambda a: NET_NAME if a == NET_NAME else 'Human')
     df[['width', 'height', 'fps', 'frame_count', 'length_seconds']] = df.apply(lambda row: db[db['video'] == row['video_full_name']].iloc[0][['width', 'height', 'fps', 'frame_count', 'length_seconds']], axis=1)
     # df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video_full_name']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)

@@ -20,7 +20,7 @@ from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.skeleton_visualization.mmpose_visualizer import MMPoseVisualizer
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
 from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare
-from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories
+from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, scan_db
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -106,7 +106,7 @@ def bar_plot_actions_count_dist(ax, df):
     gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
     # sns.histplot(data=gp, x='video', hue='legend', multiple='dodge')
-    sns.displot(data=gp, x='video', hue='legend', kde=True)
+    sns.displot(data=gp, x='video', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Actions count', ylabel='Assessments count')
 
 def bar_plot_actions_length_dist(ax, df):
@@ -114,7 +114,7 @@ def bar_plot_actions_length_dist(ax, df):
     gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
     gp['rel_length'] = gp['length'] / gp['length_seconds']
     # sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
-    sns.displot(data=gp, x='rel_length', hue='legend', kde=True)
+    sns.displot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
