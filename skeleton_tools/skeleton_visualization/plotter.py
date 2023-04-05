@@ -105,14 +105,16 @@ def bar_plot_unique_children(ax, df):
 def bar_plot_actions_count_dist(ax, df):
     gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
-    sns.histplot(data=gp, x='video', hue='legend', multiple='dodge')
+    # sns.histplot(data=gp, x='video', hue='legend', multiple='dodge')
+    sns.displot(data=gp, x='video', hue='legend', kde=True)
     ax.set(xlabel='Actions count', ylabel='Assessments count')
 
 def bar_plot_actions_length_dist(ax, df):
     gp = df.groupby(['assessment', 'legend']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
     gp['rel_length'] = gp['length'] / gp['length_seconds']
-    sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
+    # sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
+    sns.displot(data=gp, x='rel_length', hue='legend', kde=True)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
@@ -121,11 +123,12 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     df = pd.merge(g1, g2, on='assessment', how='inner')
     df.columns = ['assessment', 'human_count', 'model_count']
     df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
-    m = df[['human_count', 'model_count']].max().max()
+    m, n = df['human_count'].max(), df['model_count'].max()
+    k = min(m, n)
     sns.scatterplot(data=df, x='human_count', y='model_count', ax=ax)
     sns.regplot(data=df, x='human_count', y='model_count', ax=ax)
-    ax.plot((0, m), (0, m))
-    ax.set(xlabel='Human actions count', ylabel='Model actions count', xlim=(0, m), ylim=(0, m))
+    ax.plot((0, k), (0, k))
+    ax.set(xlabel='Human actions count', ylabel='Model actions count', xlim=(0, m), ylim=(0, n))
 
 def plot_model_vs_human_rel_length(ax, df1, df2):
     gp = []
@@ -136,10 +139,11 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
     df = pd.merge(gp[0], gp[1], on='assessment', how='inner')
     df.columns = ['assessment', 'human_rel_length', 'model_rel_length']
     df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
-    m = df[['human_rel_length', 'model_rel_length']].max().max()
+    m, n = df['human_rel_length'].max(), df['model_rel_length'].max()
+    k = min(m, n)
     sns.scatterplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
     sns.regplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
-    ax.plot((0, m), (0, m))
+    ax.plot((0, k), (0, k))
     ax.set(xlabel='Stereotypical relative length (human)', ylabel='Stereotypical relative length (model)', xlim=(0, m), ylim=(0, m))
 
 def bland_altman(ax, df1, df2):
@@ -159,6 +163,19 @@ def bland_altman(ax, df1, df2):
     ax.axhline(m + 1.96 * s, color='gray', linestyle='--')
     ax.axhline(m - 1.96 * s, color='gray', linestyle='--')
     ax.set(xlabel='Mean of human and model actions count', ylabel='Difference between human and model actions count', ylim=(-4 * s, 4 * s))
+
+def histogram_count(ax, df):
+    _gp = df.groupby(['assessment', 'video']).agg({'start_time': 'count'}).groupby('assessment').agg({'start_time': 'max'}).reset_index()
+    gp = _gp[(np.abs(stats.zscore(_gp['start_time'])) < 3)]
+    sns.histplot(data=gp, x='start_time', ax=ax)
+    ax.set(xlabel='Actions count', ylabel='Assessments count')
+
+def histogram_relative_length(ax, df):
+    df['relative_length'] = (df['end_frame'] - df['start_frame']) / df['frame_count']
+    _gp = df.groupby(['assessment', 'video']).agg({'relative_length': 'sum'}).groupby('assessment').agg({'relative_length': 'max'}).reset_index()
+    gp = _gp[(np.abs(stats.zscore(_gp['relative_length'])) < 3)]
+    sns.histplot(data=gp, x='relative_length', ax=ax)
+    ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
 
 # classmap = {0: 'Hand flapping',
@@ -349,13 +366,16 @@ def data_statistics(_df):
             df.loc[df.shape[0]] = rc
     display(lambda ax: bar_plot_lenghts(ax, df), show=True, save='data_stats')
     display(lambda ax: bar_plot_unique_children(ax, df), show=True, save='children_stats')
+    display(lambda ax: histogram_count(ax, df), show=True, save='count_stats')
+    display(lambda ax: histogram_relative_length(ax, df), show=True, save='relative_length_stats')
 
 
 if __name__ == '__main__':
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
     sns.set_style(style='white')
     human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
-    data_statistics(human)
+    # data_statistics(human)
+    # exit(0)
 
     model = 'cv0.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
