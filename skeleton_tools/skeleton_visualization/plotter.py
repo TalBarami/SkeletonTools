@@ -105,8 +105,8 @@ def bar_plot_unique_children(ax, df):
 def bar_plot_actions_count_dist(ax, df):
     gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
-    # sns.histplot(data=gp, x='video', hue='legend', multiple='dodge')
-    sns.displot(data=gp, x='video', hue='legend', kde=True, ax=ax)
+    sns.histplot(data=gp, x='video', hue='legend', kde=True, ax=ax)
+    # sns.displot(data=gp, x='video', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Actions count', ylabel='Assessments count')
 
 def bar_plot_actions_length_dist(ax, df):
@@ -114,7 +114,8 @@ def bar_plot_actions_length_dist(ax, df):
     gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
     gp['rel_length'] = gp['length'] / gp['length_seconds']
     # sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
-    sns.displot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
+    sns.histplot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
+    # sns.displot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
@@ -122,7 +123,7 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     g2 = df2.groupby('assessment').agg({'name': 'count'}).reset_index()
     df = pd.merge(g1, g2, on='assessment', how='inner')
     df.columns = ['assessment', 'human_count', 'model_count']
-    df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
+    # df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
     m, n = df['human_count'].max(), df['model_count'].max()
     k = min(m, n)
     sns.scatterplot(data=df, x='human_count', y='model_count', ax=ax)
@@ -138,7 +139,7 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
         gp.append(g[['assessment', 'rel_length']])
     df = pd.merge(gp[0], gp[1], on='assessment', how='inner')
     df.columns = ['assessment', 'human_rel_length', 'model_rel_length']
-    df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
+    # df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
     m, n = df['human_rel_length'].max(), df['model_rel_length'].max()
     k = min(m, n)
     sns.scatterplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
@@ -176,50 +177,6 @@ def histogram_relative_length(ax, df):
     gp = _gp[(np.abs(stats.zscore(_gp['relative_length'])) < 3)]
     sns.histplot(data=gp, x='relative_length', ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
-
-
-# classmap = {0: 'Hand flapping',
-#             1: 'Tapping',
-#             2: 'Clapping',
-#             3: 'Fingers',
-#             4: 'Body rocking',
-#             5: 'Tremor',
-#             6: 'Spinning in circle',
-#             7: 'Toe walking',
-#             8: 'Back and forth',
-#             9: 'Head movement',
-#             10: 'Playing with object',
-#             11: 'Jumping in place'}
-# classmap = list(classmap.values())
-#
-#
-# def plot_scores_heatmap(preds_df):
-#     v = []
-#     for i in range(len(classmap)):
-#         df = preds_df[preds_df['y'] == i][preds_df.columns[1:]]
-#         v.append(df.mean().to_numpy())
-#     v = np.round(np.array(v), 3)
-#     df_cm = pd.DataFrame(v, index=classmap, columns=classmap)
-#     plt.figure(figsize=(10, 7))
-#     ax = sns.heatmap(df_cm, annot=True)
-#     ax.figure.tight_layout()
-#     plt.savefig(r'resources/figs/heatmap.png')
-#     plt.show()
-#
-#
-# def plot_conf_matrix(preds_df, norm=False):
-#     y_hat = preds_df['y']
-#     y_pred = np.argmax(preds_df[preds_df.columns[1:]].to_numpy(), axis=1)
-#     cm = metrics.confusion_matrix(y_hat, y_pred)
-#     if norm:
-#         counts = preds_df.groupby('y')['0'].count().to_numpy()
-#         cm = np.round(cm / counts, 3)
-#     df_cm = pd.DataFrame(cm, index=classmap, columns=classmap)
-#     plt.figure(figsize=(10, 7))
-#     ax = sns.heatmap(df_cm, annot=True, fmt='g')
-#     ax.figure.tight_layout()
-#     plt.savefig(r'resources/figs/confusion_matrix.png')
-#     plt.show()
 
 def get_intersection(interval1, interval2):
     new_min = max(interval1[0], interval2[0])
@@ -300,9 +257,9 @@ def export_frames_for_figure():
         v.export_frames(vid, j, f'C:/Users/owner/Desktop/out/{name}')
 
 
-def display(f, show=False, save=None):
+def display(f, size=(8, 6), show=False, save=None):
     fig, ax = plt.subplots()
-    fig.set_size_inches(8, 6)
+    fig.set_size_inches(*size)
     f(ax)
     fig.tight_layout()
     if save:
@@ -312,9 +269,7 @@ def display(f, show=False, save=None):
     return fig
 
 def model_statistics(dfs, names):
-    db = pd.read_csv(r'Z:\recordings\db_info.csv')
-    db['video_full_name'] = db['video']
-    db['video'] = db['video'].apply(lambda v: osp.splitext(v)[0])
+    db = scan_db()
     # train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
     # # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
     # post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa2.csv')
@@ -348,8 +303,8 @@ def model_statistics(dfs, names):
     #     df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
     #              axis=1,
     #              result_type="expand")
-    display(lambda ax: bar_plot_actions_count_dist(ax, df), show=True, save='actions_count_dist')
-    display(lambda ax: bar_plot_actions_length_dist(ax, df), show=True, save='actions_length_dist')
+    display(lambda ax: bar_plot_actions_count_dist(ax, df), show=True, save='actions_count_dist', size=(8, 8))
+    display(lambda ax: bar_plot_actions_length_dist(ax, df), show=True, save='actions_length_dist', size=(8, 8))
     display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_actions_count')
     display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_rel_length')
     display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='bland_altman')
@@ -375,7 +330,6 @@ if __name__ == '__main__':
     sns.set_style(style='white')
     human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
     # data_statistics(human)
-    # exit(0)
 
     model = 'cv0.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)

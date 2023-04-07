@@ -272,7 +272,7 @@ def collect_predictions(predictions_dir, experiment_name=None, out_dir=None, mod
     # manual_fix = {
     #     '671336821_ADOS_Clinical_220118': 2268
     # }
-    df = prepare(df)
+    df = prepare(df.reset_index())
     # df['length_seconds'] = df.apply(lambda row: manual_fix[row['assessment']] if row['assessment'] in manual_fix.keys() else row['length_seconds'], axis=1)
     summary_df, assessment_df, summary_assessment_df = generate_aggregations(df)
 
@@ -287,10 +287,19 @@ def prepare(df, remove_noact=False):
     if remove_noact:
         df = df[df['movement'] != 'NoAction']
     db = scan_db()
+    drop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds', 'length', 'total_frames', 'assessment', 'child_id', 'video_path']
     df['annotator'] = df['annotator'].apply(lambda a: NET_NAME if a == NET_NAME else 'Human')
-    df[['width', 'height', 'fps', 'frame_count', 'length_seconds']] = df.apply(lambda row: db[db['video'] == row['video_full_name']].iloc[0][['width', 'height', 'fps', 'frame_count', 'length_seconds']], axis=1)
+    df = df.drop(columns=[c for c in drop_cols if c in df.columns])
+
+    missing = df[~df['video'].isin(db['basename'])]
+    if not missing.empty:
+        for k in [c for c in ['video', 'video_full_name', 'segment_name'] if c in missing.columns]:
+            df.loc[missing.index, k] = missing['video'].apply(lambda v: v.replace('Clinical', 'Control') if 'Clinical' in v else v.replace('Control', 'Clinical'))
+
+    df = pd.merge(df, db, left_on='video', right_on='basename', how='left')
+    # df[['width', 'height', 'fps', 'frame_count', 'length_seconds']] = df.apply(lambda row: db[db['video'] == row['video_full_name']].iloc[0][['width', 'height', 'fps', 'frame_count', 'length_seconds']], axis=1)
     # df[['resolution', 'fps', 'total_frames', 'length_seconds']] = df.apply(lambda row: db[db['final_name'] == row['video_full_name']].iloc[0][['fixed_resolution', 'fixed_fps', 'fixed_total_frames', 'fixed_length']], axis=1)
-    df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
+    # df['assessment                        '] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
     return df
 
 def generate_aggregations(df):

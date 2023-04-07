@@ -30,7 +30,7 @@ class DataWrapper:
     def __call__(self):
         return self.get()
 
-def scan_db(root=r'Z:\recordings', reload=True):
+def scan_db(root=r'Z:\recordings', reload=False):
     load_from = osp.join(REMOTE_STORAGE, 'recordings', 'db.csv')
     if osp.exists(load_from):
         db = pd.read_csv(load_from)
