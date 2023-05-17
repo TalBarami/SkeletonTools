@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from skeleton_tools.utils.constants import NET_NAME, DB_PATH
-from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json, scan_db
+from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, read_json, write_json
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()

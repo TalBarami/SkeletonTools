@@ -4,7 +4,7 @@ from functools import cmp_to_key
 import cv2
 import numpy as np
 
-from skeleton_tools.skeleton_visualization.painters.paint_utils import blur_area
+from skeleton_tools.skeleton_visualization.paint_components.paint_utils import blur_area
 
 
 class BasePainter(ABC):
@@ -34,9 +34,9 @@ class GlobalPainter(BasePainter):
 
 
 class LocalPainter(BasePainter):
-    def __init__(self, alpha=1.0, auto_color=None):
+    def __init__(self, alpha=1.0, color=None):
         self.alpha = alpha
-        self.auto_color = auto_color
+        self.color = color
 
     @abstractmethod
     def _get(self, data, frame_id, person_id):
@@ -46,9 +46,32 @@ class LocalPainter(BasePainter):
         return self._paint(frame, *self._get(data, frame_id, person_id))
 
     def _get_color(self, data, frame_id, person_id):
-        color = tuple(int(c) for c in data['colors'][person_id, frame_id])[::-1] if self.auto_color is None else self.auto_color
+        if type(self.color) == list:
+            color = self.color[person_id % len(self.color)]
+        elif type(self.color) == tuple:
+            color = self.color
+        else:
+            color = tuple(int(c) for c in data['colors'][person_id, frame_id])[::-1]
         return color
 
+
+class ScaleAbsPainter(GlobalPainter):
+    def __init__(self, active=True, alpha=1, beta=1):
+        super().__init__(self)
+        self.active = active
+        self.alpha = alpha
+        self.beta = beta
+
+    def switch(self, active=None):
+        if active is None:
+            self.active = not self.active
+        else:
+            self.active = active
+
+    def _paint(self, frame, data, frame_id):
+        if self.active:
+            frame = cv2.convertScaleAbs(frame, alpha=self.alpha, beta=self.beta)
+        return frame
 
 class BlurPainter(GlobalPainter):
     def __init__(self, data, active=True):

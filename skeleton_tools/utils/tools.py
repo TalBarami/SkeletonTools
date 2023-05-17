@@ -30,35 +30,6 @@ class DataWrapper:
     def __call__(self):
         return self.get()
 
-def scan_db(root=r'Z:\recordings', reload=False):
-    load_from = osp.join(REMOTE_STORAGE, 'recordings', 'db.csv')
-    if osp.exists(load_from):
-        db = pd.read_csv(load_from)
-        if not reload:
-            return db
-    else:
-        db = pd.DataFrame(columns=['filename', 'file_path', 'width', 'height', 'fps', 'frame_count', 'length_seconds'])
-
-    for r, d, fs in os.walk(root):
-        if 'Asaf' in r or 'Face camera' in r:
-            continue
-        for f in fs:
-            if f in db['filename'].unique():
-                continue
-            if f.lower().endswith('.mp4') or f.lower().endswith('.avi'):
-                try:
-                    (width, height), fps, frame_count, length_seconds = get_video_properties(osp.join(r, f))
-                    db.loc[db.shape[0]] = [f, osp.join(r, f), width, height, fps, frame_count, length_seconds]
-                except Exception as e:
-                    print(f'Error extracting information from {f}.')
-    db['basename'] = db['filename'].apply(lambda s: osp.splitext(s)[0])
-    db['assessment'] = db['basename'].apply(lambda s: '_'.join(s.split('_')[:4]))
-    db['child_id'] = db['filename'].apply(lambda s: s.split('_')[0])
-    db['type'] = db['assessment'].apply(lambda s: s.split('_')[1])
-    db['date'] = db['assessment'].apply(lambda s: s.split('_')[3])
-    db.to_csv(load_from, index=False)
-    return db
-
 def create_config(dict_conf, out=None):
     for k, v in dict_conf.items():
         if type(v) == str and ('path' in k or 'dir' in k):

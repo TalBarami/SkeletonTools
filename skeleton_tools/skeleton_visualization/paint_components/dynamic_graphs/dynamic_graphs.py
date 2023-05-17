@@ -7,9 +7,9 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import _pylab_helpers
 from scipy.signal import savgol_filter
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 
-from skeleton_tools.skeleton_visualization.painters.local_painters import GraphPainter
-from skeleton_tools.skeleton_visualization.painters.paint_utils import fig2np
+from skeleton_tools.skeleton_visualization.paint_components.paint_utils import fig2np
 
 plt.rcParams.update({'font.size': 10})
 
@@ -43,11 +43,10 @@ class DynamicSignal(DynamicGraph):
 
     def plot(self, i):
         fig, ax = plt.subplots(figsize=(self.width / self.dpi, self.height / self.dpi), dpi=self.dpi)
-        x = np.arange(i-self.radius, i+self.radius+1)
+        mn, mx = i - self.radius, i + self.radius + 1
+        x = np.arange(mn, mx)
         y = self.data[i:i+2*self.radius+1]
         ax.plot(x, y)
-        mn, mx = x.min(), x.max()
-        # xticks = np.linspace(*(np.round(np.array([mn, mx])/self.ticks) * self.ticks), (mx - mn) // self.ticks + 1)
         ax.set(title=self.title, xlabel=self.xlabel, xlim=(mn, mx), ylabel=self.ylabel, ylim=self.ylim)
         ax.axvline(x=i, color='r', linestyle='dotted')
         ax.grid()
@@ -55,8 +54,8 @@ class DynamicSignal(DynamicGraph):
         return fig2np(fig)
 
 class DynamicBar(DynamicGraph):
-    def __init__(self, title, data, legend, xlabel, ylabel, height, filters=(), dpi=128):
-        super().__init__(data=data.copy(), height=height, filters=filters, dpi=dpi)
+    def __init__(self, title, data, legend, xlabel, ylabel, height, width=None, filters=(), dpi=128):
+        super().__init__(data=data.copy(), height=height, width=width, filters=filters, dpi=dpi)
         self.title, self.legend, self.xlabel, self.ylabel = title, legend, xlabel, ylabel
 
     def plot(self, i):
@@ -76,8 +75,8 @@ def interpolate(x):
     return x
 
 class DynamicPolar(DynamicGraph):
-    def __init__(self, title, data, legend, height, filters=(), dpi=128):
-        super().__init__(data=interpolate(data), height=height, filters=filters, dpi=dpi)
+    def __init__(self, title, data, legend, height, width=None, filters=(), dpi=128):
+        super().__init__(data=interpolate(data), height=height, width=width, filters=filters, dpi=dpi)
         self.title, self.legend = title, legend
     def plot(self, i):
         fig, ax = plt.subplots(figsize=(self.width / self.dpi, self.height / self.dpi), dpi=self.dpi, subplot_kw=dict(polar=True))
@@ -89,27 +88,30 @@ class DynamicPolar(DynamicGraph):
         return fig2np(fig)
 
 class DynamicSkeleton:
-    def __init__(self, data, height, layout, epsilon, width=None):
-        self.painter = GraphPainter(layout, epsilon)
+    def __init__(self, data, height, layout, epsilon, child_only=False, width=None):
+        self.child_only = child_only
+        self.painter = GraphPainter(layout, epsilon, child_only=self.child_only)
         self.width, self.height = int(1.5 * height) if width is None else width, height
         landmarks = data['landmarks'].copy()
         (w, h) = data['resolution']
-        self.scaled_width = int(self.width * w / h)
-        landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.scaled_width / w
+        # self.scaled_width = int(self.width * w / h)
+        # landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.scaled_width / w
+        landmarks[:, :, :, 0] = landmarks[:, :, :, 0] * self.width / w
         landmarks[:, :, :, 1] = landmarks[:, :, :, 1] * self.height / h
         self.m = landmarks.shape[0]
         self.data = {
             'landmarks': landmarks,
             'landmarks_scores': data['landmarks_scores'],
             'colors': data['colors'],
+            'child_ids': data['child_ids'],
         }
 
     def plot(self, i):
         frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        d = self.width - self.scaled_width
+        # d = self.width - self.scaled_width
         for j in range(self.m):
-            frame[:, d//2:d//2+self.scaled_width] = self.painter(frame[:, d//2:d//2+self.scaled_width], self.data, i, j)
-            # frame = self.painter(frame, self.data, i, j)
+            frame = self.painter(frame, self.data, i, j)
+            # frame[:, d//2:d//2+self.scaled_width] = self.painter(frame[:, d//2:d//2+self.scaled_width], self.data, i, j)
         return frame
 
     def __call__(self, i):

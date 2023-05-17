@@ -50,10 +50,13 @@ class OpenposeInitializer:
         n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
         d = len(str(n))
         i, ret = 0, True
-        while ret:
+        while True:
             ret, frame = cap.read()
-            cv2.imwrite(osp.join(out_path, f'{name}_{str(i).zfill(d)}.jpg'), frame)
-            i += 1
+            if ret:
+                cv2.imwrite(osp.join(out_path, f'{name}_{str(i).zfill(d)}.jpg'), frame)
+                i += 1
+            else:
+                break
 
     def _exec_openpose(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO):
         init_directories(skeleton_dst)

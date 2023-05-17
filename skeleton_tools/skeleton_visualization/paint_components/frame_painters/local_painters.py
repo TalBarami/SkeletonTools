@@ -3,14 +3,14 @@ from abc import ABC
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import LocalPainter
 
-from skeleton_tools.skeleton_visualization.painters.paint_utils import blur_area
-from skeleton_tools.skeleton_visualization.painters.base_painters import LocalPainter
+from skeleton_tools.skeleton_visualization.paint_components.paint_utils import blur_area
 
 
 class BoxPainter(LocalPainter):
-    def __init__(self, alpha=1.0, auto_color=None):
-        super().__init__(alpha=alpha, auto_color=auto_color)
+    def __init__(self, alpha=1.0, color=None):
+        super().__init__(alpha=alpha, color=color)
 
     def _paint(self, frame, bbox, color):
         c, r = bbox
@@ -23,13 +23,16 @@ class BoxPainter(LocalPainter):
 
 
 class GraphPainter(LocalPainter):
-    def __init__(self, graph_layout, epsilon=1e-1, line_thickness=3, alpha=1.0, auto_color=None):
-        super().__init__(alpha=alpha, auto_color=auto_color)
+    def __init__(self, graph_layout, epsilon=1e-1, line_thickness=3, alpha=1.0, color=None, child_only=False):
+        super().__init__(alpha=alpha, color=color)
         self.graph_layout = graph_layout
         self.epsilon = epsilon
         self.line_thickness = line_thickness
+        self.child_only = child_only
 
-    def _paint(self, frame: np.ndarray, landmarks: np.ndarray, landmarks_scores: np.ndarray, color: tuple):
+    def _paint(self, frame: np.ndarray, landmarks: np.ndarray, landmarks_scores: np.ndarray, color: tuple, is_child: bool):
+        if self.child_only and not is_child:
+            return frame
         for (v1, v2) in self.graph_layout.pairs():
             if np.any(landmarks_scores[[v1, v2]] < self.epsilon):
                 continue
@@ -41,12 +44,12 @@ class GraphPainter(LocalPainter):
         return frame
 
     def _get(self, data, frame_id, person_id):
-        return data['landmarks'][person_id, frame_id], data['landmarks_scores'][person_id, frame_id], self._get_color(data, frame_id, person_id)
+        return data['landmarks'][person_id, frame_id], data['landmarks_scores'][person_id, frame_id], self._get_color(data, frame_id, person_id), data['child_ids'][frame_id] == person_id
 
 
 class TextPainter(LocalPainter, ABC):
-    def __init__(self, alpha=1.0, auto_color=None, scale=1.0):
-        super().__init__(alpha=alpha, auto_color=auto_color)
+    def __init__(self, alpha=1.0, color=None, scale=1.0):
+        super().__init__(alpha=alpha, color=color)
         self.scale = scale
 
     def _paint(self, frame, loc, text, color):
@@ -64,8 +67,8 @@ class LabelPainter(TextPainter):
 
 
 class PersonIdentityPainter(TextPainter):
-    def __init__(self, auto_color=None):
-        super().__init__(auto_color=auto_color)
+    def __init__(self, color=None):
+        super().__init__(color=color)
         self.offset = lambda: int(120 * self.scale)
 
     def _get(self, data, frame_id, person_id):
@@ -75,8 +78,8 @@ class PersonIdentityPainter(TextPainter):
 
 
 class ScorePainter(TextPainter):
-    def __init__(self, auto_color=None):
-        super().__init__(auto_color=auto_color)
+    def __init__(self, color=None):
+        super().__init__(color=color)
         self.offset = lambda: int(120 * self.scale)
 
     def _get(self, data, frame_id, person_id):

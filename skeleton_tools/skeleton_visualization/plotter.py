@@ -1,26 +1,24 @@
 import os
 from os import path as osp
-from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import matplotlib.cm as cm
-from matplotlib.patches import Patch
 import numpy as np
-# import torch.fft as fft
-from scipy.fftpack import fft
 import pandas as pd
 import seaborn as sns
-from sklearn import metrics
-from tqdm import tqdm
+from matplotlib.patches import Patch
 from scipy import stats
-
-from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
-from skeleton_tools.skeleton_visualization.mmpose_visualizer import MMPoseVisualizer
-from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, NET_NAME, STEP_SIZE, LENGTH
+# import torch.fft as fft
+from scipy.fftpack import fft
+from skeleton_tools.openpose_layouts.body import COCO_LAYOUT, BODY_25_LAYOUT
+from skeleton_tools.skeleton_visualization.data_prepare.data_extract import MMPoseDataExtractor
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, BlurPainter
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
+from skeleton_tools.skeleton_visualization.visualizer import VideoCreator
+from skeleton_tools.utils.constants import NET_NAME
 from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare
-from skeleton_tools.utils.tools import read_pkl, get_video_properties, init_directories, scan_db
+from skeleton_tools.utils.tools import init_directories
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -105,7 +103,8 @@ def bar_plot_unique_children(ax, df):
 def bar_plot_actions_count_dist(ax, df):
     gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
     gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
-    sns.histplot(data=gp, x='video', hue='legend', kde=True, ax=ax)
+    n = 16
+    sns.histplot(data=gp, x='video', hue='legend', bins=n, kde=True, ax=ax)
     # sns.displot(data=gp, x='video', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Actions count', ylabel='Assessments count')
 
@@ -114,7 +113,8 @@ def bar_plot_actions_length_dist(ax, df):
     gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
     gp['rel_length'] = gp['length'] / gp['length_seconds']
     # sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
-    sns.histplot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
+    n = 16
+    sns.histplot(data=gp, x='rel_length', hue='legend', bins=n, kde=True, ax=ax)
     # sns.displot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
@@ -123,7 +123,7 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     g2 = df2.groupby('assessment').agg({'name': 'count'}).reset_index()
     df = pd.merge(g1, g2, on='assessment', how='inner')
     df.columns = ['assessment', 'human_count', 'model_count']
-    # df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
+    df = df[(np.abs(stats.zscore(df['human_count'])) < 2) & (np.abs(stats.zscore(df['model_count'])) < 2)]
     m, n = df['human_count'].max(), df['model_count'].max()
     k = min(m, n)
     sns.scatterplot(data=df, x='human_count', y='model_count', ax=ax)
@@ -139,7 +139,7 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
         gp.append(g[['assessment', 'rel_length']])
     df = pd.merge(gp[0], gp[1], on='assessment', how='inner')
     df.columns = ['assessment', 'human_rel_length', 'model_rel_length']
-    # df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
+    df = df[(np.abs(stats.zscore(df['human_rel_length'])) < 2) & (np.abs(stats.zscore(df['model_rel_length'])) < 2)]
     m, n = df['human_rel_length'].max(), df['model_rel_length'].max()
     k = min(m, n)
     sns.scatterplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
@@ -234,10 +234,21 @@ def draw_confidence_for_assessment(root, files, human_labels_path, show=False):
 
 
 def export_frames_for_figure():
-    jordi = ['22210917', '666325510']
-    files = [f for f in os.listdir(r'D:\data\lancet_submission\train\segmented_videos') if f.split('_')[0] in jordi]
+    ids = [666325510, 1018226485, 704767285]
+    exclude = ['666325510_ADOS_Clinical_120320_0938_1', '666325510_ADOS_Clinical_120320_0938_2',
+               '666325510_Cognitive_Clinical_120320_1056_1', '666325510_Cognitive_Clinical_120320_1057_2',
+               '666325510_Cognitive_Clinical_170320_1037_1', '666325510_Cognitive_Clinical_170320_1038_2',
+               '666325510_PLS_Clinical_170320_1250_1']
+    # df = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\qa_230323_namefix.csv')
+    df = pd.read_csv(r'Z:\Users\TalBarami\models_outputs\704767285_Cognitive_Control_300522_0848_1\jordi\cv0.pth\704767285_Cognitive_Control_300522_0848_1_annotations.csv')
+    df = df[df['movement'] != 'NoAction']
+    # df = df[df['child_id'].isin(ids)]
+    # df = df[~df['video'].isin(exclude)]
+    db = scan_db()
 
-    root = r'D:\data\lancet_submission\train'
+    out = r'D:\repos\SkeletonTools\resources\figs\sample_frames'
+    # skeletons_dir = r'Z:\Users\TalBarami\jordi_cross_validation'
+    skeletons_dir = r'Z:\Users\TalBarami\models_outputs'
     # files = ['100670545_Linguistic_Clinical_090720_0909_2_Spinning in circle_13543_14028.avi',
     #          '101614003_338720063_ADOS_191217_1244_1_Spinning in circle_24660_24810.avi',
     #          '101615086_ADOS_Clinical_030320_1301_2_Head movement_30329_30480.avi',
@@ -248,13 +259,72 @@ def export_frames_for_figure():
     #          '102033871_ADOS_Clinical_191119_1216_1_Hand flapping_89295_89447.avi',
     #          '102033871_Cognitive_Clinical_041219_1301_4_Hand flapping_84776_84928.avi',
     #          '102105601_340358720_ADOS_070118_0932_1_Hand flapping_51780_52320.avi']
-    v = MMPoseVisualizer(graph_layout=COCO_LAYOUT, blur_face=True)
-    for f in files:
-        name, ext = osp.splitext(f)
-        j = read_pkl(osp.join(root, 'skeletons', 'raw', f'{name}.pkl'))
-        vid = osp.join(root, 'segmented_videos', f)
-        v.create_double_frame_video(vid, j, f'C:/Users/owner/Desktop/out/vid_{f}')
-        v.export_frames(vid, j, f'C:/Users/owner/Desktop/out/{name}')
+    extractor = MMPoseDataExtractor(COCO_LAYOUT)
+    v2 = VideoCreator(global_painters=[GlobalPainter(GraphPainter(COCO_LAYOUT, color=(150, 150, 0)))])
+    v3 = VideoCreator(global_painters=[GlobalPainter(GraphPainter(COCO_LAYOUT))])
+    for g, rows in df.groupby('video'):
+        out_dir = osp.join(out, g)
+        video_path = db[db['basename'] == g]['file_path'].iloc[0]
+        skeleton_path = osp.join(skeletons_dir, g, 'jordi', f'{g}.pkl')
+        skeleton_data = extractor(skeleton_path)
+        v1 = VideoCreator([BlurPainter(skeleton_data)])
+        init_directories(out_dir)
+        for i, row in rows.iterrows():
+            start, end = row['start_frame'], row['end_frame']
+            # if not osp.exists(osp.join(out_dir, 'frames', f'{start}.jpg')):
+            #     v1.create_image(video_path=video_path, data=skeleton_data, out_path=osp.join(out_dir, 'frames'), start=start, end=end)
+            v1.create_video(video_path=video_path, data=skeleton_data, out_path=osp.join(out_dir, 'frames.avi'), start=start, end=end)
+            # if not osp.exists(osp.join(out_dir, 'skeleton', f'{start}.jpg')):
+            #     v2.create_image(data=skeleton_data, out_path=osp.join(out_dir, 'skeleton'), start=start, end=end)
+            v2.create_video(data=skeleton_data, out_path=osp.join(out_dir, 'skeleton.avi'), start=start, end=end)
+            # if not osp.exists(osp.join(out_dir, 'child_detect', f'{start}.jpg')):
+            #     v3.create_image(data=skeleton_data, out_path=osp.join(out_dir, 'child_detect'), start=start, end=end)
+            v3.create_video(data=skeleton_data, out_path=osp.join(out_dir, 'child_detect.avi'), start=start, end=end)
+
+def take_specific_frames():
+    _root = r'D:\repos\SkeletonTools\resources\figs\sample_frames'
+    data = [('666325510_PLS_Clinical_170320_1251_4', '30'),
+            ('666325510_Cognitive_Clinical_120320_1057_4', '88563'),
+            ('704767285_Cognitive_Control_300522_0848_1', '30810.0')]
+    file, frame_str = data[2]
+    frame_num = int(float(frame_str))
+    root = osp.join(_root, file)
+
+    f1 = f'frames_{frame_str}.avi'
+    f2 = f'skeleton_{frame_str}.avi'
+    f3 = f'child_detect_{frame_str}.avi'
+    out = osp.join(root, 'figure')
+    init_directories(out)
+
+    for f in [f1, f2, f3]:
+        path = osp.join(root, f)
+        type = f.split('_')[0]
+        cap = cv2.VideoCapture(path)
+        i = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if ret:
+                # if i % 10 == 0:
+                cv2.imwrite(osp.join(out, f'{type}_{file}_{frame_num+i}.jpg'), frame)
+                i += 1
+            else:
+                break
+        cap.release()
+
+def concatenate(outputs_dir, name):
+    frames_dir = osp.join(outputs_dir, name)
+    files = os.listdir(frames_dir)
+    frames = [f for f in files if 'frames' in f]
+    skeletons = [f for f in files if 'skeleton' in f]
+    child_detect = [f for f in files if 'child' in f]
+    for files in [frames, skeletons, child_detect]:
+        files.sort(key=lambda f: int(f.split('_')[-1].split('.')[0]))
+        imgs = [cv2.imread(osp.join(frames_dir, f)) for f in files]
+        imgs = [i[700:1500, 300:900] for i in imgs]
+        img = np.concatenate(imgs, axis=1)
+        cv2.imwrite(osp.join(outputs_dir, f'{files[0]}.jpg'), img)
+
+
 
 
 def display(f, size=(8, 6), show=False, save=None):
@@ -269,6 +339,7 @@ def display(f, size=(8, 6), show=False, save=None):
     return fig
 
 def model_statistics(dfs, names):
+    dfs = intersect(*dfs)
     db = scan_db()
     # train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
     # # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
@@ -326,6 +397,11 @@ def data_statistics(_df):
 
 
 if __name__ == '__main__':
+    # export_frames_for_figure()
+    # take_specific_frames()
+    # concatenate(r'D:\repos\SkeletonTools\resources\figs\sample_frames\704767285_Cognitive_Control_300522_0848_1\figure\out', 'a')
+    # concatenate(r'D:\repos\SkeletonTools\resources\figs\sample_frames\704767285_Cognitive_Control_300522_0848_1\figure\out', 'b')
+    # exit()
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
     sns.set_style(style='white')
     human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
@@ -334,75 +410,3 @@ if __name__ == '__main__':
     model = 'cv0.pth'
     df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
     model_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
-
-    # model = 'cv1.pth'
-    # df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
-    # generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
-    #
-    # model = 'cv2.pth'
-    # df, summary_df, agg_df, summary_agg_df = collect_predictions(r'\\ac-s1\Data\Autism Center\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', model_name='binary_cd_epoch_37.pth')
-    # generate_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', 'binary_cd_epoch_37.pth'])
-
-    # df = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa_fine_tune\test.csv')
-    # label = df['y']
-    # predict = np.argmax(df[df.columns[1:]].to_numpy(), axis=1)
-    #
-    # labels = np.array(label)[:, np.newaxis]
-    # scores = df[df.columns[1:]].to_numpy()
-    # max_k_preds = np.argsort(scores, axis=1)[:, -3:][:, ::-1]
-    # match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
-    # topk_acc_score = match_array.sum() / match_array.shape[0]
-    #
-    # result = {s: (((predict == i) & (label == i)).sum() / (label == i).sum(), ((match_array == 1) & (label == i)).sum() / (label == i).sum()) for i, s in enumerate(REAL_DATA_MOVEMENTS[:-4])}
-    # for k, (v1, v2) in result.items():
-    #     print(f'{k} & {int(v1 * 100)}\\% & {int(v2 * 100)}\\% \\\\')
-    # plot_conf_matrix(df, norm=True)
-    # plot_scores_heatmap(df)
-    #
-    # df2 = pd.read_csv(r'E:\mmaction2\work_dirs\autism_center_post_qa\test.csv')
-    # label2 = df2['y']
-    # predict2 = np.argmax(df2[df2.columns[1:]].to_numpy(), axis=1)
-    #
-    # for i, c in enumerate(REAL_DATA_MOVEMENTS[:-4]):
-    #     ft_correct = np.round((np.mean((label == i) & (predict == i) & (predict2 != i)) * 100), 3)
-    #     ft_mistake = np.round((np.mean((label == i) & (predict != i) & (predict2 == i)) * 100), 3)
-    #     print(i, c, f'fine_tune: {ft_correct}%', f'scratch: {ft_mistake}%')
-    # print(np.sum((label == predict) & (label != predict2)) - np.sum((label != predict) & (label == predict2)))
-
-    # vinfos = []
-    # for root, dirs, files in os.walk(r'D:\datasets\tagging_hadas&dor\raw_videos'):
-    #     for f in files:
-    #         vinfos.append(get_video_properties(osp.join(root, f)))
-    # resolution = set([v[0] for v in vinfos])
-    # fps = np.unique([v[1] for v in vinfos])
-    # df_path = r'C:\Users\owner\PycharmProjects\RepetitiveMotionRecognition\resources\labels_complete_updated.csv'
-    # bar_plot_lenghts(df_path)
-    # bar_plot_unique_children(df_path)
-    # skeletons_root = r'D:\datasets\autism_center\skeletons_filtered\data'
-    # videos_root = r'D:\datasets\autism_center\segmented_videos'
-    #
-    # files = [osp.splitext(f)[0] for f in os.listdir(videos_root) if f.endswith('.avi')]
-    # files = [f for i, f in enumerate(files) if f'{f}.json' in set(os.listdir(skeletons_root))]
-    # names = []
-    #
-    #
-    #
-    #
-    # for label in ['Hand flapping', 'Tapping', 'Clapping', 'Body rocking',
-    #               'Tremor', 'Toe walking', 'Head movement',
-    #               'Playing with object', 'Jumping in place', 'NoAction']:
-    #     sub = [f for f in files if label in f]
-    #     for filename in sub:
-    #         data = read_json(osp.join(skeletons_root, f'{filename}.json'))['data']
-    #         if len(data) < 40:
-    #             print(f'Video is too short: {filename}')
-    #             continue
-    #         np_result = np.zeros((3, 25, len(data)))
-    #         for frame_info in data:
-    #             if frame_info['skeleton']:
-    #                 skel = frame_info['skeleton'][0]
-    #                 np_result[0, :, frame_info['frame_index']] = skel['pose'][0::2]
-    #                 np_result[1, :, frame_info['frame_index']] = skel['pose'][1::2]
-    #                 np_result[2, :, frame_info['frame_index']] = skel['pose_score']
-    #         plot_fft(np_result, label, f'{filename}')
-    #     break
