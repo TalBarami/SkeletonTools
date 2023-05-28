@@ -43,8 +43,8 @@ pd.options.display.max_columns = 99
 
 def read_db():
     _db = pd.read_csv(DB_PATH)
-    scores = pd.read_csv(SCORES_PATH, parse_dates=['date_of_birth', 'assessment_date'], infer_datetime_format=True)
+    scores = pd.read_csv(REDCAP_PATH, parse_dates=['date_of_birth', 'assessment_date'], infer_datetime_format=True)
     scores['age_days'] = scores['assessment_date'] - scores['date_of_birth']
     scores['age_years'] = scores['age_days'].dt.days / 365.25
-    db = pd.merge(_db, scores[[c for c in scores.columns if c not in _db.columns or c == 'assessment']], on='assessment')
+    db = pd.merge(_db, scores[[c for c in scores.columns if c not in _db.columns or c == 'assessment']], on='assessment', how='left').drop_duplicates(subset=['basename'])
     return db

@@ -16,13 +16,14 @@ from skeleton_tools.skeleton_visualization.data_prepare.data_extract import MMPo
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, BlurPainter
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 from skeleton_tools.skeleton_visualization.visualizer import VideoCreator
-from skeleton_tools.utils.constants import NET_NAME
+from skeleton_tools.utils.constants import NET_NAME, DB_PATH
 from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare
 from skeleton_tools.utils.tools import init_directories
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
-sns.set(font_scale=1.2)
+sns.set(font_scale=1.4)
+
 
 def plot_fft(data_numpy, title, filename):
     C, J, N = data_numpy.shape
@@ -100,23 +101,28 @@ def bar_plot_unique_children(ax, df):
     ax.set_xticks(ticks=np.arange(0, 101, 20), labels=[f'{i}%' for i in np.arange(0, 101, 20)])
     ax.set_xlabel('Percentage of children')
 
+
 def bar_plot_actions_count_dist(ax, df):
-    gp = df.groupby(['assessment', 'legend']).agg({'video': 'count'}).reset_index()
-    gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
+    gp = df.groupby(['assessment', 'video', 'Legend']).agg({'movement': 'count', 'length_seconds': 'first'}).reset_index()
+    gp = gp.groupby(['assessment', 'Legend']).agg({'movement': 'max', 'length_seconds': 'max'}).reset_index()
+    gp['count_per_minute'] = gp['movement'] / gp['length_seconds'] * 60
+    # gp = gp[(np.abs(stats.zscore(gp['count_per_minute'])) < 2)]
     n = 16
-    sns.histplot(data=gp, x='video', hue='legend', bins=n, kde=True, ax=ax)
-    # sns.displot(data=gp, x='video', hue='legend', kde=True, ax=ax)
-    ax.set(xlabel='Actions count', ylabel='Assessments count')
+    sns.histplot(data=gp, x='count_per_minute', hue='Legend', bins=n, kde=True, ax=ax)
+    ax.set(xlabel='Actions per minute', ylabel='Assessments count')
+    ax.legend(['Distribution', '# of assessments'])
+
 
 def bar_plot_actions_length_dist(ax, df):
-    gp = df.groupby(['assessment', 'legend']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
-    gp = gp[(np.abs(stats.zscore(gp['length'])) < 2)]
+    gp = df.groupby(['assessment', 'video', 'Legend']).agg({'length': 'sum', 'length_seconds': 'first'}).reset_index()
+    gp = gp.groupby(['assessment', 'Legend']).agg({'length': 'max', 'length_seconds': 'max'}).reset_index()
     gp['rel_length'] = gp['length'] / gp['length_seconds']
-    # sns.histplot(data=gp, x='rel_length', hue='legend', multiple='dodge')
+    # gp = gp[(np.abs(stats.zscore(gp['rel_length'])) < 2)]
     n = 16
-    sns.histplot(data=gp, x='rel_length', hue='legend', bins=n, kde=True, ax=ax)
-    # sns.displot(data=gp, x='rel_length', hue='legend', kde=True, ax=ax)
+    sns.histplot(data=gp, x='rel_length', hue='Legend', bins=n, kde=True, ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
+    ax.legend(['Distribution', '# of assessments'])
+
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
     g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
@@ -130,6 +136,7 @@ def plot_model_vs_human_actions_count(ax, df1, df2):
     sns.regplot(data=df, x='human_count', y='model_count', ax=ax)
     ax.plot((0, k), (0, k))
     ax.set(xlabel='Human actions count', ylabel='Model actions count', xlim=(0, m), ylim=(0, n))
+
 
 def plot_model_vs_human_rel_length(ax, df1, df2):
     gp = []
@@ -146,6 +153,7 @@ def plot_model_vs_human_rel_length(ax, df1, df2):
     sns.regplot(data=df, x='human_rel_length', y='model_rel_length', ax=ax)
     ax.plot((0, k), (0, k))
     ax.set(xlabel='Stereotypical relative length (human)', ylabel='Stereotypical relative length (model)', xlim=(0, m), ylim=(0, m))
+
 
 def bland_altman(ax, df1, df2):
     g1 = df1.groupby('assessment').agg({'name': 'count'}).reset_index()
@@ -165,11 +173,13 @@ def bland_altman(ax, df1, df2):
     ax.axhline(m - 1.96 * s, color='gray', linestyle='--')
     ax.set(xlabel='Mean of human and model actions count', ylabel='Difference between human and model actions count', ylim=(-4 * s, 4 * s))
 
+
 def histogram_count(ax, df):
     _gp = df.groupby(['assessment', 'video']).agg({'start_time': 'count'}).groupby('assessment').agg({'start_time': 'max'}).reset_index()
     gp = _gp[(np.abs(stats.zscore(_gp['start_time'])) < 3)]
     sns.histplot(data=gp, x='start_time', ax=ax)
     ax.set(xlabel='Actions count', ylabel='Assessments count')
+
 
 def histogram_relative_length(ax, df):
     df['relative_length'] = (df['end_frame'] - df['start_frame']) / df['frame_count']
@@ -178,10 +188,12 @@ def histogram_relative_length(ax, df):
     sns.histplot(data=gp, x='relative_length', ax=ax)
     ax.set(xlabel='Stereotypical relative length', ylabel='Assessments count')
 
+
 def get_intersection(interval1, interval2):
     new_min = max(interval1[0], interval2[0])
     new_max = min(interval1[1], interval2[1])
     return [new_min, new_max] if new_min <= new_max else None
+
 
 def draw_net_confidence(ax, jordi, agg, humans):
     jordi['window'] = (jordi['start_frame'] + jordi['end_frame']) / 2
@@ -200,8 +212,9 @@ def draw_net_confidence(ax, jordi, agg, humans):
     human_intervals = humans[['start_frame', 'end_frame']].values.tolist()
     intersection = [x for x in (get_intersection(y, z) for y in jordi_intervals for z in human_intervals) if x is not None]
     intersection_length = sum([(t - s) for s, t in intersection])
-    union_length = sum([(t-s) for s,t in (jordi_intervals + human_intervals)]) - intersection_length
+    union_length = sum([(t - s) for s, t in (jordi_intervals + human_intervals)]) - intersection_length
     ax.text(0.005, 0.92, f'IoU: {round(intersection_length / union_length * 100)}%', fontsize=25, ha='left', va='center', transform=ax.transAxes)
+
 
 def draw_confidence_for_assessment(root, files, human_labels_path, show=False):
     init_directories(osp.join(root, 'figs'))
@@ -281,6 +294,7 @@ def export_frames_for_figure():
             #     v3.create_image(data=skeleton_data, out_path=osp.join(out_dir, 'child_detect'), start=start, end=end)
             v3.create_video(data=skeleton_data, out_path=osp.join(out_dir, 'child_detect.avi'), start=start, end=end)
 
+
 def take_specific_frames():
     _root = r'D:\repos\SkeletonTools\resources\figs\sample_frames'
     data = [('666325510_PLS_Clinical_170320_1251_4', '30'),
@@ -305,11 +319,12 @@ def take_specific_frames():
             ret, frame = cap.read()
             if ret:
                 # if i % 10 == 0:
-                cv2.imwrite(osp.join(out, f'{type}_{file}_{frame_num+i}.jpg'), frame)
+                cv2.imwrite(osp.join(out, f'{type}_{file}_{frame_num + i}.jpg'), frame)
                 i += 1
             else:
                 break
         cap.release()
+
 
 def concatenate(outputs_dir, name):
     frames_dir = osp.join(outputs_dir, name)
@@ -325,8 +340,6 @@ def concatenate(outputs_dir, name):
         cv2.imwrite(osp.join(outputs_dir, f'{files[0]}.jpg'), img)
 
 
-
-
 def display(f, size=(8, 6), show=False, save=None):
     fig, ax = plt.subplots()
     fig.set_size_inches(*size)
@@ -338,15 +351,15 @@ def display(f, size=(8, 6), show=False, save=None):
         plt.show()
     return fig
 
+
 def model_statistics(dfs, names):
     dfs = intersect(*dfs)
-    db = scan_db()
     # train = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\labels.csv')
     # # pre_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_pre_qa.csv')
     # post_qa = pd.read_csv(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\annotations\human_post_qa2.csv')
     # jordi = collect_labels(r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\JORDIv4', 'jordi/binary_cd_epoch_37.pth')
     # jordi = jordi[jordi['movement'] != 'NoAction']
-    # exclude = ['666852718_ADOS_Clinical_301120', '663954442_ADOS_Clinical_210920', '666814726_ADOS_Clinical_110717']
+    exclude = ['666852718', '663954442', '666814726']
     # pre_qa, post_qa, jordi = intersect(pre_qa, post_qa, jordi, on='video')
     # fig, (ax1, ax2) = plt.subplots(1, 2)
     # fig.set_size_inches(15, 6)
@@ -357,7 +370,6 @@ def model_statistics(dfs, names):
     # plt.show()
 
     # dfs, names = zip(*[(post_qa, 'Human'), (jordi, 'Model')])
-    legend = {'Human': 'Human', 'cv0.pth': 'Model'}
     for df, name in zip(dfs, names):
         df['basename'] = df['video'].apply(lambda v: osp.splitext(v)[0])
         df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-2]))
@@ -365,20 +377,22 @@ def model_statistics(dfs, names):
         # df.drop(df[df['video'].isin(exclude)].index, inplace=True)
     df = pd.concat(dfs)
     df = df[df['movement'] != 'NoAction']
+    db = pd.read_csv(DB_PATH)
     df['assessment'] = df['video'].apply(lambda v: '_'.join(v.split('_')[:-1]))
     df['child'] = df['assessment'].apply(lambda a: a.split('_')[0])
     df['length'] = df['end_time'] - df['start_time']
-    df['legend'] = df['name'].apply(lambda n: legend[n])
+    df['Legend'] = df['name']
+    df['length_seconds'] = df['video'].apply(lambda v: db[db['basename'] == v]['length_seconds'].iloc[0])
 
     # df[['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']] = \
     #     df.apply(lambda v: db[db['video'] == v['video']].iloc[0][['path', 'width', 'height', 'fps', 'frame_count', 'length_seconds']],
     #              axis=1,
     #              result_type="expand")
-    display(lambda ax: bar_plot_actions_count_dist(ax, df), show=True, save='actions_count_dist', size=(8, 8))
-    display(lambda ax: bar_plot_actions_length_dist(ax, df), show=True, save='actions_length_dist', size=(8, 8))
-    display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_actions_count')
-    display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_rel_length')
-    display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='bland_altman')
+    display(lambda ax: bar_plot_actions_count_dist(ax, df), show=True, save='actions_count_dist', size=(6, 6))
+    display(lambda ax: bar_plot_actions_length_dist(ax, df), show=True, save='actions_length_dist', size=(6, 6))
+    # display(lambda ax: plot_model_vs_human_actions_count(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_actions_count')
+    # display(lambda ax: plot_model_vs_human_rel_length(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='model_vs_human_rel_length')
+    # display(lambda ax: bland_altman(ax, df[df['name'] == 'Human'], df[df['name'] != 'Human']), show=True, save='bland_altman')
 
 
 def data_statistics(_df):
@@ -395,7 +409,20 @@ def data_statistics(_df):
     display(lambda ax: histogram_count(ax, df), show=True, save='count_stats')
     display(lambda ax: histogram_relative_length(ax, df), show=True, save='relative_length_stats')
 
+    fig, ax = plt.subplots()
+    gp = df.groupby(['assessment', 'Legend']).agg({'video': 'count'}).reset_index()
+    gp = gp[(np.abs(stats.zscore(gp['video'])) < 2)]
+    n = 16
+    sns.histplot(data=gp, x='video', hue='Legend', bins=n, kde=True, ax=ax)
+    ax.set(xlabel='Actions count', ylabel='Assessments count')
+    fig.tight_layout()
+    plt.show()
 
+
+cids = [1006723600, 1009730632, 1012020277, 1014362914, 1016034706, 1016119861, 1016169022, 1017665404, 1017666865, 1017854941, 1017991189, 1018091428, 1018093207, 1018171321, 1019520097, 1019524600, 1019534968, 1019737348, 1019928946, 1020229279, 1020232399, 1020232741, 1020280537, 1020356866, 1020840187, 1021074145, 1021119094, 672641044, 1021205218, 1021205716, 1021218634, 1021220041, 1021226305, 1021229647, 1021247194, 1021255855, 1021259545, 1021264195, 1021264696, 1021280263, 1021280386, 1021311823, 1021313080, 1021374739, 1021379188, 1021396366, 1021410529, 1021775038, 1021794247, 1021801294, 1022031991, 1023996280, 1024252834, 1026126388, 1026131164, 1026131461, 1026623464, 1026631978, 1026643636, 1026666508, 1026671704, 1029200926, 1032308617, 1032318493, 1032336166, 1032346012, 1032358114, 1032467836, 1032548029, 1032581863, 1032613978, 1032669376, 1032693706, 1032737035, 666325510, 663911920, 664010395, 664022104, 664191175, 664209490, 664257328, 664292125, 664323535,
+        664325617, 664650412, 664905604, 664973815, 665978449, 666058111, 666059845, 666101551, 666147613, 666169936, 666170974, 666198229, 666238693, 666260098, 666271387, 666273793, 1016164216, 666299845, 666327940, 666398206, 666725203, 666728917, 666755029, 666763069, 666770197, 666783493, 666789355, 666808807, 666885463, 666896602, 669769576, 671332390, 671332663, 671496484, 671499553, 671609842, 672624811, 672644434, 672652330, 672652900, 672984133, 673002079, 673019275, 673020094, 673021180, 673039195, 673057642, 673058110, 673079620, 673086178, 673098976, 673109044, 673119394, 673140628, 673161793, 673165576, 673179490, 673179910, 673194088, 673243234, 673268731, 673273975, 673950985, 675344092, 675350128, 675556051, 675574717, 675582640, 675586522, 675605971, 675627832, 675667054, 675670297, 675698041, 675702529, 675734524, 675737197, 675746851, 675773878, 675794917, 675807640, 675818950, 675827389, 675835975, 675844315, 679538797, 681787636, 984664126, 991680802, 1017096055,
+        1021784743, 1024402006, 1027718011, 1029179797, 1029183859, 1029690886, 1030823962, 1031466274, 1032314131, 1032341833, 1032372673, 1032377323, 1032382294, 1032406999, 1032442435, 1032443998, 1032464122, 1032470011, 1032482908, 1032515131, 1032527656, 1032533449, 1032551617, 1032551638, 1032618016, 1032620911, 1032646177, 1032654025, 1032660589, 1032702517, 1032735409, 1032766588, 1032776491, 1032781165, 1034680636, 1034998021, 666789877, 666830041, 666911641, 668067349, 668082499, 670619293, 670931986, 671257546, 671280265, 671338009, 671611000, 672652306, 673049497, 673098007, 673155703, 673235122, 673372111, 675527842, 675793378, 675824320, 675839716, 675853075, 675873676, 675902650, 677426581, 678147601, 678745981, 679022293, 679257913, 679266529, 680005483, 680527114, 681746749, 683771299, 683842552, 684133783, 684544366, 685926727,
+        666795838, 666814726, 667997179, 668041255, 669770491, 673038484, 1009772854, 1016158174, 1020741259, 1028846038, 1032316954]
 if __name__ == '__main__':
     # export_frames_for_figure()
     # take_specific_frames()
@@ -404,9 +431,28 @@ if __name__ == '__main__':
     # exit()
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
     sns.set_style(style='white')
-    human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
+    # human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
     # data_statistics(human)
 
-    model = 'cv0.pth'
-    df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name=model)
-    model_statistics([df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]], ['Human', model])
+    # model = 'cv0.pth'
+    # df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name='cv0.pth')
+    # human, model = df[df['annotator'] != NET_NAME], df[df['annotator'] == NET_NAME]
+    # df = pd.read_csv(r'Z:\Users\TalBarami\videos_qa\qa_processed.csv')
+    # model = df.dropna(subset=['jordi_start', 'jordi_end']).copy()
+    # human = df.dropna(subset=['human_start', 'human_end']).copy()
+    # human['start_time'], human['end_time'], human['movement'] = human['human_start'] / model['fps'], human['human_end'] / human['fps'], human['qa_hadas']
+    # model['start_time'], model['end_time'], model['movement'] = model['jordi_start'] / model['fps'], model['jordi_end'] / model['fps'], model['jordi_annotation']
+    # model_statistics([human, model], ['Human', 'Model'])
+
+    # Training data statistics:
+    df = pd.read_csv(r'Z:\Users\TalBarami\videos_qa\qa_processed.csv')
+    df = df[df['human_start'].notna()]
+    df = df[df['human_annotation'] != 'NoAction']
+    df = df[df['child_id'].isin(cids)]
+    df['human_start'] = df['human_start'] / df['fps']
+    df['human_end'] = df['human_end'] / df['fps']
+    df[['start_time', 'end_time', 'movement']] = df[['human_start', 'human_end', 'human_annotation']]
+    # human = df[df['annotator'] != NET_NAME].copy()
+    model_statistics([df], ['Human'])
+
+    print()

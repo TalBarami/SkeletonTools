@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from skeleton_tools.skeleton_visualization.data_prepare.reader import VideoReader, DefaultReader
 from skeleton_tools.skeleton_visualization.paint_components.dynamic_graphs.dynamic_graphs import DynamicPolar, DynamicSignal, DynamicSkeleton
-from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, ScaleAbsPainter
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, ScaleAbsPainter, BlurPainter
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import LabelPainter, ScorePainter, BoxPainter, GraphPainter
 from tqdm import tqdm
 from os import path as osp
@@ -139,19 +139,19 @@ def create_jordi(video_path, skeleton_path, predictions_path, out_path, start=No
     width, height = data['resolution']
     epsilon = 0.3
     # local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4), LabelPainter(), ScorePainter(), BoxPainter()]
-    local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=1.0, color=[(255, 128, 0), (0, 255, 128), (128, 0, 255)], child_only=False)]
-    # local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4, child_only=False), LabelPainter()]
-    global_painters = [ScaleAbsPainter(alpha=1.5, beta=6)] + [GlobalPainter(p) for p in local_painters]
-    # global_painters = [GlobalPainter(p) for p in local_painters]
-    # graphs = [DynamicSignal('Stereotypical Action', data['predictions'], ['Stereotypical'],
-    #                         'Time', 'Score',
-    #                         window_size=1000,
-    #                         height=int(height * 0.5),
-    #                         width=width // 2,
-    #                         filters=()),
-    #           DynamicSkeleton(layout=extractor.graph_layout, epsilon=epsilon, data=data, child_only=True,
-    #                           height=int(height * 0.5), width=width // 2)]
-    graphs = []
+    # local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=1.0, color=[(255, 128, 0), (0, 255, 128), (128, 0, 255)], child_only=False)]
+    local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4, child_only=False)]
+    # global_painters = [ScaleAbsPainter(alpha=1.5, beta=6)] + [GlobalPainter(p) for p in local_painters]
+    global_painters = [BlurPainter(data)] + [GlobalPainter(p) for p in local_painters]
+    graphs = [DynamicSignal('Stereotypical Action', data['predictions'], ['Stereotypical'],
+                            'Time', 'Score',
+                            window_size=1000,
+                            height=int(height * 0.5),
+                            width=width,
+                            filters=()),
+              DynamicSkeleton(layout=extractor.graph_layout, epsilon=epsilon, data=data, child_only=True,
+                              height=int(height * 0.5), width=width)]
+    # graphs = []
 
     vc = VideoCreator(global_painters=global_painters, local_painters=[], graphs=graphs, scale=scale)
     vc.create_video(video_path=video_path, data=data, out_path=out_path, start=start, end=end, unit='frame')

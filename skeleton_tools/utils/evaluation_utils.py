@@ -286,7 +286,7 @@ def collect_predictions(predictions_dir, experiment_name=None, out_dir=None, mod
 def prepare(df, remove_noact=False):
     if remove_noact:
         df = df[df['movement'] != 'NoAction']
-    db = scan_db()
+    db = pd.read_csv(DB_PATH)
     drop_cols = ['width', 'height', 'fps', 'frame_count', 'length_seconds', 'length', 'total_frames', 'assessment', 'child_id', 'video_path']
     df['annotator'] = df['annotator'].apply(lambda a: NET_NAME if a == NET_NAME else 'Human')
     df = df.drop(columns=[c for c in drop_cols if c in df.columns])
