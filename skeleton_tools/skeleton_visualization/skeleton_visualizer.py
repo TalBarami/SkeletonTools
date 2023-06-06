@@ -12,6 +12,21 @@ from skeleton_tools.utils.constants import COLORS, EPSILON
 from skeleton_tools.utils.skeleton_utils import bounding_box
 
 
+def convert_to_bgr(value, minimum=0, maximum=1):
+    minimum, maximum = float(minimum), float(maximum)
+    halfmax = (minimum + maximum) / 2
+    if minimum <= value <= halfmax:
+        r = 0
+        g = int(255. / (halfmax - minimum) * (value - minimum))
+        b = int(255. + -255. / (halfmax - minimum) * (value - minimum))
+        return (r, g, b)
+    elif halfmax < value <= maximum:
+        r = int(255. / (maximum - halfmax) * (value - halfmax))
+        g = int(255. + -255. / (maximum - halfmax) * (value - halfmax))
+        b = 0
+        return b, g, r, 255
+
+
 class SkeletonVisualizer(ABC):
     def __init__(self, graph_layout, display_pid=False, display_bbox=False, denormalize=False, decentralize=False, blur_face=False, display_child_bbox=False):
         self.graph_layout = graph_layout
@@ -75,13 +90,11 @@ class SkeletonVisualizer(ABC):
             if score[v1] > epsilon and score[v2] > epsilon:
                 cv2.line(img, tuple(pose[v1]), tuple(pose[v2]), edge_color, thickness=thickness, lineType=cv2.LINE_AA)
         if saliency is not None:
-            cmap = plt.get_cmap("inferno")
             # mask = img * 0
             for j, sal in zip(pose, saliency):
-                if any(np.isnan(s) for s in sal):
+                if np.isnan(sal):
                     continue
-                intensity = sal.mean()
-                cv2.circle(img=img, center=j, radius=0, color=np.array(cmap(intensity)) * 255, thickness=int(intensity ** 0.5 * 20))
+                cv2.circle(img=img, center=j, radius=0, color=convert_to_bgr(sal), thickness=int(sal ** 0.5 * 20))
             # blurred_mask = cv2.blur(mask, (12, 12))
             # img = img * 0.25 + blurred_mask * 0.75
         # for i, (x, y) in enumerate(pose):
@@ -115,7 +128,6 @@ class SkeletonVisualizer(ABC):
     def create_video(self, video_path, skeleton_data, out_path, start=None, end=None, double_frame=False):
         skeleton_data = self.prepare(video_path, skeleton_data)
         fps, length, (width, height) = skeleton_data['fps'], skeleton_data['length'], (skeleton_data['width'], skeleton_data['height'])
-        cmap = plt.get_cmap("inferno")
         start = int(0 if start is None else start * fps)
         end = int(length if end is None else end * fps)
         width_multiplier = 2 if double_frame else 1
@@ -126,10 +138,12 @@ class SkeletonVisualizer(ABC):
         for i in tqdm(range(start, end), desc="Writing video result"):
             ret, frame = cap.read()
             skel_frame = self.draw_skeletons(np.zeros_like(frame) if double_frame else frame, i, skeleton_data)
+            out_frame = np.concatenate((frame, skel_frame), axis=1) if double_frame else skel_frame
+            if 'prediction_score' in skeleton_data.keys():
+                cv2.putText(out_frame, str(np.round(skeleton_data['prediction_score'], 3)), (int(width * (width_multiplier - 1 + 0.05)), int(height * 0.05)), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2, cv2.LINE_AA)
             if 'time_importance' in skeleton_data.keys():
-                skel_frame = cv2.circle(img=skel_frame, center=(0, width // width_multiplier), radius=0,
-                                        color=np.array(cmap(int(skeleton_data['time_importance'][0][i]))) * 255, thickness=30)
-            out.write(np.concatenate((frame, skel_frame), axis=1) if double_frame else skel_frame)
+                out_frame = cv2.circle(img=out_frame, center=(width * width_multiplier // 2, height // 2), radius=0, color=convert_to_bgr(skeleton_data['time_importance'][i]), thickness=30)
+            out.write(out_frame)
         cap.release()
         out.release()
 

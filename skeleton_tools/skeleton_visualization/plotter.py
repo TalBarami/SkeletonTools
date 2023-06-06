@@ -454,6 +454,51 @@ if __name__ == '__main__':
     df['human_start'] = df['human_start'] / df['fps']
     df['human_end'] = df['human_end'] / df['fps']
     df[['start_time', 'end_time', 'movement']] = df[['human_start', 'human_end', 'human_annotation']]
+
+    _df = df.copy()
+    df = pd.DataFrame(columns=['child_key', 'assessment', 'start', 'end', 'fps', 'frame_count', 'length_seconds', 'valid_frames'])
+    for i, row in _df.iterrows():
+        child_key, assessment, start, end, fps, frame_count, length_seconds = row[['child_id', 'assessment', 'human_start', 'human_end', 'fps', 'frame_count', 'length_seconds']]
+        if len(df[(df['child_key'] == child_key) & (df['assessment'] == assessment) & (df['start'] == start) & (df['end'] == end)]) > 0:
+            continue
+        df = df.append({'child_key': child_key, 'assessment': assessment, 'start': start, 'end': end, 'fps': fps, 'frame_count': frame_count, 'length_seconds': length_seconds, 'valid_frames': 0}, ignore_index=True)
+
+    # TODO: Go over df, combine to info per assessment. Create new df.
+    #  Take from skeletons data the number of visible-child frames per video. Calculate proportion of time & count
+    #  Split train/test
+    _db = pd.read_csv(r'Z:\Autism Center\recordings\redcap_db.csv')
+    _db2 = pd.read_csv(r'Z:\Autism Center\recordings\db.csv')
+
+    trn_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\train_children_stats.csv').dropna(subset='child_key')
+    trn_cids = trn_df['child_key'].astype(int).unique()
+    trn = _db[_db['child_key'].isin(trn_cids)]
+
+    tst_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\test_children_stats.csv')
+    tst_cids = tst_df['child_id'].unique()
+    tst = _db[_db['child_key'].isin(tst_cids)]
+
+    # AGE:
+    print(trn.groupby('child_key').first()['age_years'].mean(), trn.groupby('child_key').first()['age_years'].std(),
+          tst.groupby('child_key').first()['age_years'].mean(), tst.groupby('child_key').first()['age_years'].std())
+    # ADOS:
+    ados_trn = trn[trn['repeat_instrument'].apply(lambda i: 'ADOS' in i)].groupby('child_key').first()
+    ados_tst = tst[tst['repeat_instrument'].apply(lambda i: 'ADOS' in i)].groupby('child_key').first()
+    print('ADOS Total', ados_trn['x2'].astype(float).mean(), ados_trn['x2'].astype(float).std(), ados_tst['x2'].astype(float).mean(), ados_tst['x2'].astype(float).std())
+    print('ADOS SA', ados_trn['x0'].astype(float).mean(), ados_trn['x0'].astype(float).std(), ados_tst['x0'].astype(float).mean(), ados_tst['x0'].astype(float).std())
+    print('ADOS RRB', ados_trn['x1'].astype(float).mean(), ados_trn['x1'].astype(float).std(), ados_tst['x1'].astype(float).mean(), ados_tst['x1'].astype(float).std())
+    print('ADOS D2', ados_trn['x3'].astype(float).mean(), ados_trn['x3'].astype(float).std(), ados_tst['x3'].astype(float).mean(), ados_tst['x3'].astype(float).std())
+    d4_trn = ados_trn.apply(lambda r: r['x4'] if 'Toddlers' not in r['repeat_instrument'] else r['x5'], axis=1)
+    d4_tst = ados_tst.apply(lambda r: r['x4'] if 'Toddlers' not in r['repeat_instrument'] else r['x5'], axis=1)
+    print('ADOS D4', d4_trn.astype(float).mean(), d4_trn.astype(float).std(), d4_tst.astype(float).mean(), d4_tst.astype(float).std())
+    # COGNITIVE
+    cog_trn = trn[trn['repeat_instrument'].apply(lambda i: 'Cognitive' in i)].groupby('child_key').first()
+    cog_tst = tst[tst['repeat_instrument'].apply(lambda i: 'Cognitive' in i)].groupby('child_key').first()
+    print('Cognitive', cog_trn['x1'].astype(float).mean(), cog_trn['x1'].astype(float).std(), cog_tst['x1'].astype(float).mean(), cog_tst['x1'].astype(float).std())
+    # PLS
+    pls_trn = trn[trn['repeat_instrument'].apply(lambda i: 'PLS' in i)].groupby('child_key').first()
+    pls_tst = tst[tst['repeat_instrument'].apply(lambda i: 'PLS' in i)].groupby('child_key').first()
+    print('PLS', pls_trn['x0'].astype(float).mean(), pls_trn['x0'].astype(float).std(), pls_tst['x0'].astype(float).mean(), pls_tst['x0'].astype(float).std())
+
     # human = df[df['annotator'] != NET_NAME].copy()
     model_statistics([df], ['Human'])
 
