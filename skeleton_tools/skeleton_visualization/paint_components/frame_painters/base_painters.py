@@ -111,7 +111,7 @@ class BlurPainter(GlobalPainter):
         if self.active:
             boxes = self.data['blur_boxes'][:, frame_id]
             for (c, r) in boxes:
-                r = max(r.max(), 0) // 2
+                r = max(r.max(), 0) #// 2
                 frame = blur_area(frame, c, r)
         return frame
 

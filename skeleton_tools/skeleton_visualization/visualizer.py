@@ -6,7 +6,7 @@ import pandas as pd
 from skeleton_tools.skeleton_visualization.data_prepare.reader import VideoReader, DefaultReader
 from skeleton_tools.skeleton_visualization.paint_components.dynamic_graphs.dynamic_graphs import DynamicPolar, DynamicSignal, DynamicSkeleton
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, ScaleAbsPainter, BlurPainter
-from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import LabelPainter, ScorePainter, BoxPainter, GraphPainter
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import LabelPainter, ScorePainter, BoxPainter, GraphPainter, CustomTextPainter
 from tqdm import tqdm
 from os import path as osp
 import os
@@ -120,7 +120,7 @@ def create_barni(video_path, pkl_path, out_path, start=None, end=None, scale=1):
     child_emotions = interpolate(child_emotions)
     width, height = data['resolution']
 
-    local_painters = [GraphPainter(extractor.graph_layout, epsilon=t, alpha=0.4), BoxPainter()]
+    local_painters = [GraphPainter(extractor.graph_layout, epsilon=t, alpha=0.4), BoxPainter(), CustomTextPainter((50, 50), 'rotations', child_only=True)]
     global_painters = [GlobalPainter(p) for p in local_painters]
     graphs = [DynamicPolar('AUs', child_aus, AU_COLS, height=height // 2, width=width // 2, filters=()),
               DynamicSignal('Emotions', child_emotions, EMOTION_COLS,

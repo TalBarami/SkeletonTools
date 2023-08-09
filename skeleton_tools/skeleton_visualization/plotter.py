@@ -18,8 +18,8 @@ from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 from skeleton_tools.skeleton_visualization.visualizer import VideoCreator
 from skeleton_tools.utils.constants import NET_NAME, DB_PATH
-from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare
-from skeleton_tools.utils.tools import init_directories
+from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare, collect_labels
+from skeleton_tools.utils.tools import init_directories, read_pkl
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -109,9 +109,9 @@ def bar_plot_actions_count_dist(ax, df):
     gp['count_per_minute'] = gp['movement'] / gp['length_seconds'] * 60
     # gp = gp[(np.abs(stats.zscore(gp['count_per_minute'])) < 2)]
     n = 32
-    sns.histplot(data=gp, x='count_per_minute', hue='Legend', bins=n, kde=True, ax=ax)
+    sns.histplot(data=gp, x='count_per_minute', bins=n, kde=True, ax=ax)
     ax.set(xlabel='SMMs per minute', ylabel='Assessments count')
-    ax.legend(['Distribution'])
+    # ax.legend(['Distribution'])
 
 
 def bar_plot_actions_length_dist(ax, df):
@@ -120,10 +120,10 @@ def bar_plot_actions_length_dist(ax, df):
     gp['rel_length'] = gp['length'] / gp['length_seconds'] * 100
     # gp = gp[(np.abs(stats.zscore(gp['rel_length'])) < 2)]
     n = 32
-    sns.histplot(data=gp, x='rel_length', hue='Legend', bins=n, kde=True, ax=ax)
+    sns.histplot(data=gp, x='rel_length', bins=n, kde=True, ax=ax)
     ax.set(xlabel='Percentage of time with SMMs', ylabel='Assessments count')
     ax.xaxis.set_major_formatter(mtick.PercentFormatter())
-    ax.legend(['Distribution'])
+    # ax.legend(['Distribution'])
 
 
 def plot_model_vs_human_actions_count(ax, df1, df2):
@@ -421,10 +421,9 @@ def data_statistics(_df):
     plt.show()
 
 
-cids = [1006723600, 1009730632, 1012020277, 1014362914, 1016034706, 1016119861, 1016169022, 1017665404, 1017666865, 1017854941, 1017991189, 1018091428, 1018093207, 1018171321, 1019520097, 1019524600, 1019534968, 1019737348, 1019928946, 1020229279, 1020232399, 1020232741, 1020280537, 1020356866, 1020840187, 1021074145, 1021119094, 672641044, 1021205218, 1021205716, 1021218634, 1021220041, 1021226305, 1021229647, 1021247194, 1021255855, 1021259545, 1021264195, 1021264696, 1021280263, 1021280386, 1021311823, 1021313080, 1021374739, 1021379188, 1021396366, 1021410529, 1021775038, 1021794247, 1021801294, 1022031991, 1023996280, 1024252834, 1026126388, 1026131164, 1026131461, 1026623464, 1026631978, 1026643636, 1026666508, 1026671704, 1029200926, 1032308617, 1032318493, 1032336166, 1032346012, 1032358114, 1032467836, 1032548029, 1032581863, 1032613978, 1032669376, 1032693706, 1032737035, 666325510, 663911920, 664010395, 664022104, 664191175, 664209490, 664257328, 664292125, 664323535,
-        664325617, 664650412, 664905604, 664973815, 665978449, 666058111, 666059845, 666101551, 666147613, 666169936, 666170974, 666198229, 666238693, 666260098, 666271387, 666273793, 1016164216, 666299845, 666327940, 666398206, 666725203, 666728917, 666755029, 666763069, 666770197, 666783493, 666789355, 666808807, 666885463, 666896602, 669769576, 671332390, 671332663, 671496484, 671499553, 671609842, 672624811, 672644434, 672652330, 672652900, 672984133, 673002079, 673019275, 673020094, 673021180, 673039195, 673057642, 673058110, 673079620, 673086178, 673098976, 673109044, 673119394, 673140628, 673161793, 673165576, 673179490, 673179910, 673194088, 673243234, 673268731, 673273975, 673950985, 675344092, 675350128, 675556051, 675574717, 675582640, 675586522, 675605971, 675627832, 675667054, 675670297, 675698041, 675702529, 675734524, 675737197, 675746851, 675773878, 675794917, 675807640, 675818950, 675827389, 675835975, 675844315, 679538797, 681787636, 984664126, 991680802, 1017096055,
-        1021784743, 1024402006, 1027718011, 1029179797, 1029183859, 1029690886, 1030823962, 1031466274, 1032314131, 1032341833, 1032372673, 1032377323, 1032382294, 1032406999, 1032442435, 1032443998, 1032464122, 1032470011, 1032482908, 1032515131, 1032527656, 1032533449, 1032551617, 1032551638, 1032618016, 1032620911, 1032646177, 1032654025, 1032660589, 1032702517, 1032735409, 1032766588, 1032776491, 1032781165, 1034680636, 1034998021, 666789877, 666830041, 666911641, 668067349, 668082499, 670619293, 670931986, 671257546, 671280265, 671338009, 671611000, 672652306, 673049497, 673098007, 673155703, 673235122, 673372111, 675527842, 675793378, 675824320, 675839716, 675853075, 675873676, 675902650, 677426581, 678147601, 678745981, 679022293, 679257913, 679266529, 680005483, 680527114, 681746749, 683771299, 683842552, 684133783, 684544366, 685926727,
-        666795838, 666814726, 667997179, 668041255, 669770491, 673038484, 1009772854, 1016158174, 1020741259, 1028846038, 1032316954, 663875689, 664007080]
+cids = [1009730632, 1009772854, 1016158174, 1020280537, 1020741259, 1021119094, 1021379188, 1029183859, 1032377323, 1032735409, 1032737035, 1032776491, 664292125, 665978449, 666131845, 666147613, 669769576, 669770467, 670619293, 673000315, 673065142, 673098976, 673145725, 673165576, 675527842, 675667054, 675873676, 675902650, 679538797, 1016119861, 1017096055, 1019534968, 1020229279, 1020356866, 1021264195, 1021264696, 1024656712, 1026623464, 1030823962, 1032358114, 1032515131, 664323535, 666299845, 666725203, 666728917, 666858607, 666868732, 671499553, 672624811, 673036351, 673101400, 673140628, 673161793, 673268731, 673273975, 675586522, 675700420, 1006723600, 1007196724, 1017665404, 1021218634, 1021280386, 1021410529, 1026643636, 1026666508, 1032382294, 1032464122, 1032551617, 663176965, 663849727, 664022104, 664209490, 666169936, 666273793, 666783493, 666830041, 672984133, 675670297, 675737197, 675773878, 675818950, 675844315, 679022293, 1012018123, 1015608034, 1016034706, 1016155105, 1017666865, 1017743491, 1018596427, 1020232741, 1020840187, 1026131164, 1026131461, 1026671704, 1032308617, 1032318493, 1032443998, 1032467836, 1032693706, 666058111, 666198229, 666238693, 666260098, 666308833, 666770197, 671336821, 673098007, 673155703, 673179910, 673243234, 675698041, 678147601, 680527114, 685926727, 1014362914, 1016164216, 1016169022, 1016336155, 1016769832, 1017854941, 1018091428, 1018093207, 1019524600, 1019729578, 1019737348, 1021071151, 1021074145, 1021205218, 1021205716, 1021226305, 1021247194, 1021259545, 1021313080, 1021374739, 1021400350, 1021784743, 1022031991, 1026126388, 1026631978, 1029690886, 1032314131, 1032346012, 1032372673, 1032442435, 1032470011, 1032527656, 1032548029, 1032551638, 1032618016, 1032620911, 1032654025, 1032660589, 1032669376, 1032702517, 1032733549, 1032766588, 1034998021, 648591529, 663875689, 663911920, 664007080, 664204363, 664257328, 664325617, 664905604, 666012973, 666017224, 666059845, 666101551, 666216691, 666271387, 1017991189, 1021311823, 1028846038, 1032781165, 1032781861, 1034680636, 663981493, 673020094, 675839716, 681787636, 1014252508, 1021280263, 1021396366, 1027718011, 1029200926, 1031466274, 1032406999, 1032482908, 666034600, 671609842, 673235122, 1021265038, 1023996280, 1032581863, 1032774442, 666763069, 666789355, 666808807, 673057642, 675627832, 675734524, 675807640, 677426581, 679257913, 1021229647, 1021255855, 1021801294, 666398206, 671338009, 673058110, 1012020277, 1019520097, 1019928946, 1021220041, 1021794247, 1024402006, 1032336166, 664650412] \
+       + [1010768620, 1014252484, 1018171321, 1020232399, 1021775038, 1021788034, 1024252834, 1024530979, 1032533449, 1032613978, 1032646177, 645433144, 664015048, 664191175, 664277797, 664973815, 666170974, 666264085, 666431047, 666676315, 666795838, 666814726, 666885463, 666911641, 667997179, 668041255, 668067349, 668082499, 669770491, 671257546, 671611000, 672652900, 673038484, 673079620, 673950985, 675556051, 675605971, 675702529, 679266529, 991680802]
+
 if __name__ == '__main__':
     # export_frames_for_figure()
     # take_specific_frames()
@@ -451,34 +450,58 @@ if __name__ == '__main__':
     df = df[df['human_start'].notna()]
     df = df[df['human_annotation'] != 'NoAction']
     df = df[df['child_id'].isin(cids)]
+    # df = df[~df['child_id'].isin(exclude)]
+    tst_cids = df[df['model'] == 'cv0.pth']['child_id'].unique()
+    trn_cids = [x for x in df['child_id'].unique() if x not in tst_cids]
     df['human_start'] = df['human_start'] / df['fps']
     df['human_end'] = df['human_end'] / df['fps']
     df[['start_time', 'end_time', 'movement']] = df[['human_start', 'human_end', 'human_annotation']]
+    # human = df[df['annotator'] != NET_NAME].copy()
+    model_statistics([df], ['Human'])
 
     _df = df.copy()
-    df = pd.DataFrame(columns=['child_key', 'assessment', 'start', 'end', 'fps', 'frame_count', 'length_seconds', 'valid_frames'])
+    df = pd.DataFrame(columns=['child_key', 'assessment', 'start', 'end', 'fps', 'frame_count', 'length_seconds'])
     for i, row in _df.iterrows():
         child_key, assessment, start, end, fps, frame_count, length_seconds = row[['child_id', 'assessment', 'human_start', 'human_end', 'fps', 'frame_count', 'length_seconds']]
         if len(df[(df['child_key'] == child_key) & (df['assessment'] == assessment) & (df['start'] == start) & (df['end'] == end)]) > 0:
             continue
-        df = df.append({'child_key': child_key, 'assessment': assessment, 'start': start, 'end': end, 'fps': fps, 'frame_count': frame_count, 'length_seconds': length_seconds, 'valid_frames': 0}, ignore_index=True)
+        df.loc[len(df)] = [child_key, assessment, start, end, fps, frame_count, length_seconds]
+    df['length'] = df['end'] - df['start']
+
+    print(f'Video Length', df.groupby('assessment').first()['length_seconds'].mean() / 60, df.groupby('assessment').first()['length_seconds'].std() / 60)
+    print(f'Segment Length', df.groupby('assessment')['length'].sum().mean() / 60, df.groupby('assessment')['length'].sum().std() / 60)
+    print(f'Count', df.groupby('assessment')['start'].count().mean(), df.groupby('assessment')['start'].count().std())
+    print('Count/Minute', (df.groupby('assessment')['start'].count() / df.groupby('assessment')['length_seconds'].first() * 60).mean(), (df.groupby('assessment')['start'].count() / df.groupby('assessment')['length_seconds'].first() * 60).std())
+    print('SMM time minutes', (df.groupby('assessment')['length'].sum() / df.groupby('assessment')['length_seconds'].first()).mean(), (df.groupby('assessment')['length'].sum() / df.groupby('assessment')['length_seconds'].first()).std())
+
+    # preds = pd.concat([collect_labels(r'Z:\Users\TalBarami\models_outputs\processed', f'jordi\\cv{i}.pth', 'conclusion') for i in range(5)])
+    # preds['child_id'] = preds['video'].apply(lambda v: int(v.split('_')[0]))
+    # preds = preds[preds['child_id'].isin(cids)]
 
     # TODO: Go over df, combine to info per assessment. Create new df.
     #  Take from skeletons data the number of visible-child frames per video. Calculate proportion of time & count
     #  Split train/test
-    _db = pd.read_csv(r'Z:\Autism Center\recordings\redcap_db.csv')
-    _db2 = pd.read_csv(r'Z:\Autism Center\recordings\db.csv')
+    _db = pd.read_csv(r'Z:\recordings\redcap_db.csv')
+    _db2 = pd.read_csv(r'Z:\recordings\db.csv')
 
-    trn_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\train_children_stats.csv').dropna(subset='child_key')
-    trn_cids = trn_df['child_key'].astype(int).unique()
+    # trn_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\train_children_stats.csv').dropna(subset='child_key')
+    # trn_cids = trn_df['child_key'].astype(int).unique()
     trn = _db[_db['child_key'].isin(trn_cids)]
 
-    tst_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\test_children_stats.csv')
-    tst_cids = tst_df['child_id'].unique()
+    # tst_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\test_children_stats.csv')
+    # tst_cids = tst_df['child_id'].unique()
     tst = _db[_db['child_key'].isin(tst_cids)]
 
+    # GENDER
+    male_trn = trn[trn['gender'] == 'Male'].groupby('child_key').first()['diagnosis'].count()
+    female_trn = trn[trn['gender'] == 'Female'].groupby('child_key').first()['diagnosis'].count()
+    male_tst = tst[tst['gender'] == 'Male'].groupby('child_key').first()['diagnosis'].count()
+    female_tst = tst[tst['gender'] == 'Female'].groupby('child_key').first()['diagnosis'].count()
+    print('GENDER-MALE', male_trn, male_trn / (male_trn + female_trn), male_tst, male_tst / (male_tst + female_tst))
+    print('GENDER-FEMALE', female_trn, female_trn / (male_trn + female_trn), female_tst, female_tst / (male_tst + female_tst))
+
     # AGE:
-    print(trn.groupby('child_key').first()['age_years'].mean(), trn.groupby('child_key').first()['age_years'].std(),
+    print('AGE', trn.groupby('child_key').first()['age_years'].mean(), trn.groupby('child_key').first()['age_years'].std(),
           tst.groupby('child_key').first()['age_years'].mean(), tst.groupby('child_key').first()['age_years'].std())
     # ADOS:
     ados_trn = trn[trn['repeat_instrument'].apply(lambda i: 'ADOS' in i)].groupby('child_key').first()
@@ -499,7 +522,114 @@ if __name__ == '__main__':
     pls_tst = tst[tst['repeat_instrument'].apply(lambda i: 'PLS' in i)].groupby('child_key').first()
     print('PLS', pls_trn['x0'].astype(float).mean(), pls_trn['x0'].astype(float).std(), pls_tst['x0'].astype(float).mean(), pls_tst['x0'].astype(float).std())
 
-    # human = df[df['annotator'] != NET_NAME].copy()
-    model_statistics([df], ['Human'])
-
+    pop = pd.DataFrame(columns=['child_key', 'set', 'gender', 'age', 'ados_total', 'ados_sa', 'ados_rrb', 'ados_d2', 'ados_d4', 'cognitive', 'pls'])
+    for cid in trn_cids:
+        if cid not in ados_trn.index:
+            continue
+        ados = ados_trn.loc[cid]
+        total, sa, rrb, d2, d4 = ados['x2'], ados['x0'], ados['x1'], ados['x3'], ados['x4'] if 'Toddlers' not in ados['repeat_instrument'] else ados['x5']
+        cog = cog_trn.loc[cid]['x1'] if cid in cog_trn.index else np.nan
+        pls = pls_trn.loc[cid]['x0'] if cid in pls_trn.index else np.nan
+        age = ados_trn.loc[cid]['age_years']
+        gender = ados_trn.loc[cid]['gender']
+        # add row to pop:
+        pop.loc[pop.shape[0]] = [cid, 'train', gender, age, total, sa, rrb, d2, d4, cog, pls]
+    for cid in tst_cids:
+        if cid not in ados_tst.index:
+            continue
+        ados = ados_tst.loc[cid]
+        total, sa, rrb, d2, d4 = ados['x2'], ados['x0'], ados['x1'], ados['x3'], ados['x4'] if 'Toddlers' not in ados['repeat_instrument'] else ados['x5']
+        cog = cog_tst.loc[cid]['x1'] if cid in cog_tst.index else np.nan
+        pls = pls_tst.loc[cid]['x0'] if cid in pls_tst.index else np.nan
+        age = ados_tst.loc[cid]['age_years']
+        gender = ados_tst.loc[cid]['gender']
+        # add row to pop:
+        pop.loc[pop.shape[0]] = [cid, 'test', gender, age, total, sa, rrb, d2, d4, cog, pls]
     print()
+
+    preds = pd.read_csv(r'\\ac-s1\Data\Autism Center\Users\TalBarami\videos_qa\qa_processed.csv')
+    preds['human_length'] = (preds['human_end'] - preds['human_start']) / (preds['fps'] * preds['length_seconds']) * 100
+    preds['jordi_length'] = (preds['jordi_end'] - preds['jordi_start']) / (preds['fps'] * preds['length_seconds']) * 100
+    g1 = preds[preds['qa_hadas'] != 'NoAction'].groupby(['video']).agg({'child_id': 'count', 'length_seconds': 'first', 'human_length': 'sum', 'jordi_length': 'sum'})
+    g2 = preds[preds['jordi_annotation'] != 'NoAction'].groupby(['video']).agg({'child_id': 'count', 'length_seconds': 'first', 'human_length': 'sum', 'jordi_length': 'sum'})
+    grp = pd.merge(g1, g2, on='video', how='inner').reset_index()[['video', 'child_id_x', 'child_id_y', 'length_seconds_x', 'human_length_x', 'jordi_length_x']]
+    grp.columns = ['video', 'human_count', 'jordi_count', 'duration', 'human_length', 'jordi_length']
+    grp['human_count'] = grp['human_count'] / grp['duration'] * 60
+    grp['jordi_count'] = grp['jordi_count'] / grp['duration'] * 60
+    grp['diff_count'] = np.abs(grp['human_count'] - grp['jordi_count'])
+    grp['diff_length'] = np.abs(grp['human_length'] - grp['jordi_length'])
+    grp['child_key'] = grp['video'].apply(lambda v: v.split('_')[0]).astype(int)
+    df_preds = pd.merge(pop, grp, on='child_key', how='left').dropna()
+    df_preds['ados_total'] = df_preds['ados_total'].astype(float)
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches((6, 6))
+    m, n = df_preds['age'].max(), df_preds['jordi_count'].max()
+    # k = max(m, n) * 1.05
+    m *= 1.05
+    n *= 1.05
+    sns.scatterplot(data=df_preds, x='age', y='jordi_count', hue='gender', ax=ax)
+    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
+    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
+    ax.set(title=f'Actions per minute', xlabel='Age', ylabel='Actions per minute', xlim=(0, m), ylim=(0, n))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    fig.tight_layout()
+    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
+    plt.show()
+    r_val, p_val = stats.pearsonr(df_preds['age'], df_preds['jordi_count'])
+    print(f'Correlation Human vs Jordi actions/minute: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches((6, 6))
+    m, n = df_preds['age'].max(), df_preds['jordi_length'].max()
+    # k = max(m, n) * 1.05
+    m *= 1.05
+    n *= 1.05
+    sns.scatterplot(data=df_preds, x='age', y='jordi_length', hue='gender', ax=ax)
+    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
+    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
+    ax.set(title=f'Percentage of time with SMMs per video', xlabel='Age', ylabel='% of time', xlim=(0, m), ylim=(0, n))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    fig.tight_layout()
+    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
+    plt.show()
+    r_val, p_val = stats.pearsonr(df_preds['age'], df_preds['jordi_length'])
+    print(f'Correlation Human vs Jordi rel_length/video: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches((6, 6))
+    m, n = df_preds['ados_total'].max(), df_preds['jordi_count'].max()
+    m *= 1.05
+    n *= 1.05
+    # k = max(m, n) * 1.05
+    sns.scatterplot(data=df_preds, x='ados_total', y='jordi_count', hue='gender', ax=ax)
+    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
+    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
+    ax.set(title=f'Actions per minute', xlabel='ADOS Total', ylabel='Actions per minute', xlim=(0, m), ylim=(0, n))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    fig.tight_layout()
+    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
+    plt.show()
+    r_val, p_val = stats.pearsonr(df_preds['ados_total'], df_preds['jordi_count'])
+    print(f'Correlation Human vs Jordi actions/minute: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches((6, 6))
+    m, n = df_preds['ados_total'].max(), df_preds['jordi_length'].max()
+    # k = max(m, n) * 1.05
+    m *= 1.05
+    n *= 1.05
+    sns.scatterplot(data=df_preds, x='ados_total', y='jordi_length', hue='gender', ax=ax)
+    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
+    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
+    ax.set(title=f'Percentage of time with SMMs per video', xlabel='ADOS Total', ylabel='% of time', xlim=(0, m), ylim=(0, n))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    fig.tight_layout()
+    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
+    plt.show()
+    r_val, p_val = stats.pearsonr(df_preds['ados_total'], df_preds['jordi_length'])
+    print(f'Correlation Human vs Jordi rel_length/video: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+
+    # TODO: Add SA & RRB
+    # TODO: Correlation

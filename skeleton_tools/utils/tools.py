@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 import pandas as pd
 import numpy as np
 import cv2
+from scipy import stats
 
 from skeleton_tools.utils.constants import REMOTE_STORAGE
 pd.set_option('display.expand_frame_repr', False)
@@ -153,6 +154,21 @@ def get_video_properties(filename, method='ffmpeg'):
         finally:
             cap.release()
     return resolution, fps, frame_count, length
+
+def entropy(v):
+    v = v.dropna()
+    if v.shape[0] == 1:
+        return np.zeros(v.shape[1])
+    s = np.squeeze(v.values)
+    if s.ndim == 1:
+        s = s[:, np.newaxis]
+    mins = np.min(s, axis=0)
+    maxs = np.max(s, axis=0)
+    bins = np.array([np.linspace(mins[i], maxs[i], num=50) for i in range(s.shape[1])])
+    histograms = np.array([x for (x, _) in [np.histogram(s[:, i], bins=bins[i]) for i in range(s.shape[1])]])
+    probs = histograms / len(v) + 1e-10
+    e = stats.entropy(probs, axis=1)
+    return e
 
 
 def generate_label_json(skeletons_dir):

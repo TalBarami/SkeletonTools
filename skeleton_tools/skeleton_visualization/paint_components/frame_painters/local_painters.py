@@ -59,6 +59,22 @@ class TextPainter(LocalPainter, ABC):
         return frame
 
 
+class CustomTextPainter(TextPainter):
+    def __init__(self, location, key, child_only=False):
+        super().__init__()
+        self.location = np.array(location)
+        self.key = key
+        self.child_only = child_only
+
+    def _paint(self, frame, loc, text, color, is_child):
+        if self.child_only and not is_child:
+            return frame
+        return super()._paint(frame, loc, text, color)
+
+    def _get(self, data, frame_id, person_id):
+        return self.location, str(data[self.key][person_id, frame_id]), self._get_color(data, frame_id, person_id), data['child_ids'][frame_id] == person_id
+
+
 class LabelPainter(TextPainter):
     def _get(self, data, frame_id, person_id):
         (cx, cy), (w, h) = data['face_boxes'][person_id, frame_id]
