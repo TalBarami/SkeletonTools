@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+import scipy
 import seaborn as sns
 from matplotlib.patches import Patch
 import matplotlib.ticker as mtick
@@ -20,6 +21,7 @@ from skeleton_tools.skeleton_visualization.visualizer import VideoCreator
 from skeleton_tools.utils.constants import NET_NAME, DB_PATH
 from skeleton_tools.utils.evaluation_utils import intersect, collect_predictions, prepare, collect_labels
 from skeleton_tools.utils.tools import init_directories, read_pkl
+from sklearn.metrics import mean_squared_error
 
 pd.set_option('display.expand_frame_repr', False)
 sns.set_theme()
@@ -561,75 +563,41 @@ if __name__ == '__main__':
     grp['child_key'] = grp['video'].apply(lambda v: v.split('_')[0]).astype(int)
     df_preds = pd.merge(pop, grp, on='child_key', how='left').dropna()
     df_preds['ados_total'] = df_preds['ados_total'].astype(float)
+    df_preds['ados_sa'] = df_preds['ados_sa'].astype(float)
+    df_preds['ados_rrb'] = df_preds['ados_rrb'].astype(float)
+    df_preds['cognitive'] = df_preds['cognitive'].astype(float)
 
-    fig, ax = plt.subplots()
-    fig.set_size_inches((6, 6))
-    m, n = df_preds['age'].max(), df_preds['jordi_count'].max()
-    # k = max(m, n) * 1.05
-    m *= 1.05
-    n *= 1.05
-    sns.scatterplot(data=df_preds, x='age', y='jordi_count', hue='gender', ax=ax)
-    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
-    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
-    ax.set(title=f'Actions per minute', xlabel='Age', ylabel='Actions per minute', xlim=(0, m), ylim=(0, n))
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-    fig.tight_layout()
-    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
-    plt.show()
-    r_val, p_val = stats.pearsonr(df_preds['age'], df_preds['jordi_count'])
-    print(f'Correlation Human vs Jordi actions/minute: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+    def annotate(ax, data, x, y, fontsize, kappa=None):
+        slope, intercept, rvalue, pvalue, stderr = scipy.stats.linregress(x=data[x], y=data[y])
+        rmse = mean_squared_error(data[x], data[y], squared=False)
+        p = f'p<0.001' if pvalue < 0.001 else f'p={pvalue:.2f}'
+        text = f'r={rvalue :.2f}\n{p}\nRMSE={rmse:.2f}'
+        if kappa is not None:
+            text += f'\n$\\kappa$={kappa:.2f}'
+        ax.text(.7, .1, text, transform=ax.transAxes, fontsize=fontsize,
+                bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
 
-    fig, ax = plt.subplots()
-    fig.set_size_inches((6, 6))
-    m, n = df_preds['age'].max(), df_preds['jordi_length'].max()
-    # k = max(m, n) * 1.05
-    m *= 1.05
-    n *= 1.05
-    sns.scatterplot(data=df_preds, x='age', y='jordi_length', hue='gender', ax=ax)
-    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
-    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
-    ax.set(title=f'Percentage of time with SMMs per video', xlabel='Age', ylabel='% of time', xlim=(0, m), ylim=(0, n))
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-    fig.tight_layout()
-    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
-    plt.show()
-    r_val, p_val = stats.pearsonr(df_preds['age'], df_preds['jordi_length'])
-    print(f'Correlation Human vs Jordi rel_length/video: {r_val}, p-value: {p_val}, n={len(df_preds)}')
+    def gen_graph(df, x_col, y_col, hue_col, title, xlabel, ylabel, perc=False):
+        fig, ax = plt.subplots()
+        fig.set_size_inches((6, 6))
+        m, n = df[x_col].max(), df[y_col].max()
+        # k = max(m, n) * 1.05
+        m *= 1.05
+        n *= 1.05
+        sns.scatterplot(data=df, x=x_col, y=y_col, hue=hue_col, ax=ax)
+        annotate(ax, df, x_col, y_col, fontsize=12)
+        # ax.plot((0, k), (0, k), color='gray', linestyle='--')
+        ax.set(title=title, xlabel=xlabel, ylabel=ylabel, xlim=(0, m), ylim=(0, n))
+        if perc:
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+        fig.tight_layout()
+        fig.savefig(f'resources/figs/corr_{x_col}_{y_col}.png', dpi=300)
+        plt.show()
+        r_val, p_val = stats.pearsonr(df[x_col], df[y_col])
+        print(f'Correlation between {x_col} and {y_col}: {r_val:.3f}, p={p_val:.3f}')
 
-    fig, ax = plt.subplots()
-    fig.set_size_inches((6, 6))
-    m, n = df_preds['ados_total'].max(), df_preds['jordi_count'].max()
-    m *= 1.05
-    n *= 1.05
-    # k = max(m, n) * 1.05
-    sns.scatterplot(data=df_preds, x='ados_total', y='jordi_count', hue='gender', ax=ax)
-    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
-    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
-    ax.set(title=f'Actions per minute', xlabel='ADOS Total', ylabel='Actions per minute', xlim=(0, m), ylim=(0, n))
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-    fig.tight_layout()
-    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
-    plt.show()
-    r_val, p_val = stats.pearsonr(df_preds['ados_total'], df_preds['jordi_count'])
-    print(f'Correlation Human vs Jordi actions/minute: {r_val}, p-value: {p_val}, n={len(df_preds)}')
-
-
-    fig, ax = plt.subplots()
-    fig.set_size_inches((6, 6))
-    m, n = df_preds['ados_total'].max(), df_preds['jordi_length'].max()
-    # k = max(m, n) * 1.05
-    m *= 1.05
-    n *= 1.05
-    sns.scatterplot(data=df_preds, x='ados_total', y='jordi_length', hue='gender', ax=ax)
-    # annotate(ax, group, 'human_length', 'jordi_length', fontsize=12)
-    # ax.plot((0, k), (0, k), color='gray', linestyle='--')
-    ax.set(title=f'Percentage of time with SMMs per video', xlabel='ADOS Total', ylabel='% of time', xlim=(0, m), ylim=(0, n))
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-    fig.tight_layout()
-    # fig.savefig('resources/figures/model_annotators_action_length_qa.png')
-    plt.show()
-    r_val, p_val = stats.pearsonr(df_preds['ados_total'], df_preds['jordi_length'])
-    print(f'Correlation Human vs Jordi rel_length/video: {r_val}, p-value: {p_val}, n={len(df_preds)}')
-
-    # TODO: Add SA & RRB
-    # TODO: Correlation
+    for col in ['age', 'ados_total', 'ados_sa', 'cognitive']:
+        cap_col = col[0].upper() + col[1:]
+        gen_graph(df_preds, col, 'jordi_count', 'gender', 'Actions per minute', cap_col, 'Actions per minute')
+        gen_graph(df_preds, col, 'jordi_length', 'gender', 'Percentage of time with SMMs', cap_col, 'Percentage of time with SMMs', perc=True)
+    print()
