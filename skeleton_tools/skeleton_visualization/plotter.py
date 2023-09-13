@@ -423,9 +423,11 @@ def data_statistics(_df):
     plt.show()
 
 
-cids = [1009730632, 1009772854, 1016158174, 1020280537, 1020741259, 1021119094, 1021379188, 1029183859, 1032377323, 1032735409, 1032737035, 1032776491, 664292125, 665978449, 666131845, 666147613, 669769576, 669770467, 670619293, 673000315, 673065142, 673098976, 673145725, 673165576, 675527842, 675667054, 675873676, 675902650, 679538797, 1016119861, 1017096055, 1019534968, 1020229279, 1020356866, 1021264195, 1021264696, 1024656712, 1026623464, 1030823962, 1032358114, 1032515131, 664323535, 666299845, 666725203, 666728917, 666858607, 666868732, 671499553, 672624811, 673036351, 673101400, 673140628, 673161793, 673268731, 673273975, 675586522, 675700420, 1006723600, 1007196724, 1017665404, 1021218634, 1021280386, 1021410529, 1026643636, 1026666508, 1032382294, 1032464122, 1032551617, 663176965, 663849727, 664022104, 664209490, 666169936, 666273793, 666783493, 666830041, 672984133, 675670297, 675737197, 675773878, 675818950, 675844315, 679022293, 1012018123, 1015608034, 1016034706, 1016155105, 1017666865, 1017743491, 1018596427, 1020232741, 1020840187, 1026131164, 1026131461, 1026671704, 1032308617, 1032318493, 1032443998, 1032467836, 1032693706, 666058111, 666198229, 666238693, 666260098, 666308833, 666770197, 671336821, 673098007, 673155703, 673179910, 673243234, 675698041, 678147601, 680527114, 685926727, 1014362914, 1016164216, 1016169022, 1016336155, 1016769832, 1017854941, 1018091428, 1018093207, 1019524600, 1019729578, 1019737348, 1021071151, 1021074145, 1021205218, 1021205716, 1021226305, 1021247194, 1021259545, 1021313080, 1021374739, 1021400350, 1021784743, 1022031991, 1026126388, 1026631978, 1029690886, 1032314131, 1032346012, 1032372673, 1032442435, 1032470011, 1032527656, 1032548029, 1032551638, 1032618016, 1032620911, 1032654025, 1032660589, 1032669376, 1032702517, 1032733549, 1032766588, 1034998021, 648591529, 663875689, 663911920, 664007080, 664204363, 664257328, 664325617, 664905604, 666012973, 666017224, 666059845, 666101551, 666216691, 666271387, 1017991189, 1021311823, 1028846038, 1032781165, 1032781861, 1034680636, 663981493, 673020094, 675839716, 681787636, 1014252508, 1021280263, 1021396366, 1027718011, 1029200926, 1031466274, 1032406999, 1032482908, 666034600, 671609842, 673235122, 1021265038, 1023996280, 1032581863, 1032774442, 666763069, 666789355, 666808807, 673057642, 675627832, 675734524, 675807640, 677426581, 679257913, 1021229647, 1021255855, 1021801294, 666398206, 671338009, 673058110, 1012020277, 1019520097, 1019928946, 1021220041, 1021794247, 1024402006, 1032336166, 664650412] \
-       + [1010768620, 1014252484, 1018171321, 1020232399, 1021775038, 1021788034, 1024252834, 1024530979, 1032533449, 1032613978, 1032646177, 645433144, 664015048, 664191175, 664277797, 664973815, 666170974, 666264085, 666431047, 666676315, 666795838, 666814726, 666885463, 666911641, 667997179, 668041255, 668067349, 668082499, 669770491, 671257546, 671611000, 672652900, 673038484, 673079620, 673950985, 675556051, 675605971, 675702529, 679266529, 991680802]
-
+cids = [1009730632, 1009772854, 1016158174, 1020280537, 1020741259, 1021119094, 1021379188, 1029183859, 1032377323, 1032735409, 1032737035, 1032776491, 664292125, 665978449, 666131845, 666147613, 669769576, 669770467, 670619293, 673000315, 673065142, 673098976, 673145725, 673165576, 675527842, 675667054, 675873676, 675902650, 679538797, 1016119861, 1017096055, 1019534968, 1020229279, 1020356866, 1021264195, 1021264696, 1024656712, 1026623464, 1030823962, 1032358114, 1032515131, 664323535, 666299845, 666725203, 666728917, 666858607, 666868732, 671499553, 672624811, 673036351, 673101400, 673140628, 673161793, 673268731, 673273975, 675586522, 675700420, 1006723600, 1007196724, 1017665404, 1021218634, 1021280386, 1021410529, 1026643636, 1026666508, 1032382294, 1032464122, 1032551617, 663176965, 663849727, 664022104, 664209490, 666169936, 666273793, 666783493, 666830041, 672984133, 675670297, 675737197, 675773878, 675818950, 675844315, 679022293, 1012018123, 1015608034, 1016034706,
+        1016155105, 1017666865, 1017743491, 1018596427, 1020232741, 1020840187, 1026131164, 1026131461, 1026671704, 1032308617, 1032318493, 1032443998, 1032467836, 1032693706, 666058111, 666198229, 666238693, 666260098, 666308833, 666770197, 671336821, 673098007, 673155703, 673179910, 673243234, 675698041, 678147601, 680527114, 685926727, 1014362914, 1016164216, 1016169022, 1016336155, 1016769832, 1017854941, 1018091428, 1018093207, 1019524600, 1019729578, 1019737348, 1021071151, 1021074145, 1021205218, 1021205716, 1021226305, 1021247194, 1021259545, 1021313080, 1021374739, 1021400350, 1021784743, 1022031991, 1026126388, 1026631978, 1029690886, 1032314131, 1032346012, 1032372673, 1032442435, 1032470011, 1032527656, 1032548029, 1032551638, 1032618016, 1032620911, 1032654025, 1032660589, 1032669376, 1032702517, 1032733549, 1032766588, 1034998021, 663875689, 663911920, 664007080, 664204363, 664257328, 664325617, 664905604, 666012973, 666017224, 666059845, 666101551, 666216691,
+        666271387, 1017991189, 1021311823, 1028846038, 1032781165, 1032781861, 1034680636, 663981493, 673020094, 675839716, 681787636, 1014252508, 1021280263, 1021396366, 1027718011, 1029200926, 1031466274, 1032406999, 1032482908, 666034600, 671609842, 673235122, 1021265038, 1023996280, 1032581863, 1032774442, 666763069, 666789355, 666808807, 673057642, 675627832, 675734524, 675807640, 677426581, 679257913, 1021229647, 1021255855, 1021801294, 666398206, 671338009, 673058110, 1012020277, 1019520097, 1019928946, 1021220041, 1021794247, 1024402006, 1032336166, 664650412] \
+       + [1010768620, 1014252484, 1018171321, 1020232399, 1021775038, 1021788034, 1024252834, 1024530979, 1032533449, 1032613978, 1032646177, 664015048, 664191175, 664277797, 664973815, 666170974, 666264085, 666431047, 666676315, 666795838, 666814726, 666885463, 666911641, 667997179, 668041255, 668067349, 668082499, 669770491, 671257546, 671611000, 672652900, 673038484, 673079620, 673950985, 675556051, 675605971, 675702529, 679266529, 991680802]
+# age: 648591529; 645433144
 if __name__ == '__main__':
     # export_frames_for_figure()
     # take_specific_frames()
@@ -459,15 +461,10 @@ if __name__ == '__main__':
     df['human_end'] = df['human_end'] / df['fps']
     df[['start_time', 'end_time', 'movement']] = df[['human_start', 'human_end', 'human_annotation']]
     # human = df[df['annotator'] != NET_NAME].copy()
-    model_statistics([df], ['Human'])
+    # model_statistics([df], ['Human'])
 
-    _df = df.copy()
-    df = pd.DataFrame(columns=['child_key', 'assessment', 'start', 'end', 'fps', 'frame_count', 'length_seconds'])
-    for i, row in _df.iterrows():
-        child_key, assessment, start, end, fps, frame_count, length_seconds = row[['child_id', 'assessment', 'human_start', 'human_end', 'fps', 'frame_count', 'length_seconds']]
-        if len(df[(df['child_key'] == child_key) & (df['assessment'] == assessment) & (df['start'] == start) & (df['end'] == end)]) > 0:
-            continue
-        df.loc[len(df)] = [child_key, assessment, start, end, fps, frame_count, length_seconds]
+    df = df.drop_duplicates(subset=['child_id', 'assessment', 'human_start', 'human_end'])[['child_id', 'assessment', 'human_start', 'human_end', 'fps', 'frame_count', 'length_seconds']]
+    df.columns = ['child_key', 'assessment', 'start', 'end', 'fps', 'frame_count', 'length_seconds']
     df['length'] = df['end'] - df['start']
 
     print(f'Video Length', df.groupby('assessment').first()['length_seconds'].mean() / 60, df.groupby('assessment').first()['length_seconds'].std() / 60)
@@ -489,10 +486,12 @@ if __name__ == '__main__':
     # trn_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\train_children_stats.csv').dropna(subset='child_key')
     # trn_cids = trn_df['child_key'].astype(int).unique()
     trn = _db[_db['child_key'].isin(trn_cids)]
+    trn['group'] = 'train'
 
     # tst_df = pd.read_csv(r'Z:\Autism Center\Users\TalBarami\lancet_submission_data\test_children_stats.csv')
     # tst_cids = tst_df['child_id'].unique()
     tst = _db[_db['child_key'].isin(tst_cids)]
+    tst['group'] = 'test'
 
     # GENDER
     male_trn = trn[trn['gender'] == 'Male'].groupby('child_key').first()['diagnosis'].count()
@@ -524,48 +523,124 @@ if __name__ == '__main__':
     pls_tst = tst[tst['repeat_instrument'].apply(lambda i: 'PLS' in i)].groupby('child_key').first()
     print('PLS', pls_trn['x0'].astype(float).mean(), pls_trn['x0'].astype(float).std(), pls_tst['x0'].astype(float).mean(), pls_tst['x0'].astype(float).std())
 
-    pop = pd.DataFrame(columns=['child_key', 'set', 'gender', 'age', 'ados_total', 'ados_sa', 'ados_rrb', 'ados_d2', 'ados_d4', 'cognitive', 'pls'])
-    for cid in trn_cids:
-        if cid not in ados_trn.index:
-            continue
-        ados = ados_trn.loc[cid]
-        total, sa, rrb, d2, d4 = ados['x2'], ados['x0'], ados['x1'], ados['x3'], ados['x4'] if 'Toddlers' not in ados['repeat_instrument'] else ados['x5']
-        cog = cog_trn.loc[cid]['x1'] if cid in cog_trn.index else np.nan
-        pls = pls_trn.loc[cid]['x0'] if cid in pls_trn.index else np.nan
-        age = ados_trn.loc[cid]['age_years']
-        gender = ados_trn.loc[cid]['gender']
-        # add row to pop:
-        pop.loc[pop.shape[0]] = [cid, 'train', gender, age, total, sa, rrb, d2, d4, cog, pls]
-    for cid in tst_cids:
-        if cid not in ados_tst.index:
-            continue
-        ados = ados_tst.loc[cid]
-        total, sa, rrb, d2, d4 = ados['x2'], ados['x0'], ados['x1'], ados['x3'], ados['x4'] if 'Toddlers' not in ados['repeat_instrument'] else ados['x5']
-        cog = cog_tst.loc[cid]['x1'] if cid in cog_tst.index else np.nan
-        pls = pls_tst.loc[cid]['x0'] if cid in pls_tst.index else np.nan
-        age = ados_tst.loc[cid]['age_years']
-        gender = ados_tst.loc[cid]['gender']
-        # add row to pop:
-        pop.loc[pop.shape[0]] = [cid, 'test', gender, age, total, sa, rrb, d2, d4, cog, pls]
-    print()
+    merged = pd.concat([trn, tst])
+    merged['assessment_date'] = pd.to_datetime(merged['assessment_date'])
+    ADOS = merged[merged['repeat_instrument'].apply(lambda i: 'ADOS' in i)].groupby('child_key').first()
+    COG = merged[merged['repeat_instrument'].apply(lambda i: 'Cognitive' in i)].groupby('child_key').first()
+    PLS = merged[merged['repeat_instrument'].apply(lambda i: 'PLS' in i)].groupby('child_key').first()
+    ABCS = merged[merged['repeat_instrument'].apply(lambda i: 'Abc' in i)].groupby('child_key').first()
+    ABAS = merged[merged['repeat_instrument'].apply(lambda i: 'Abas' in i)].groupby('child_key').first()
+    SENSORY = merged[merged['repeat_instrument'].apply(lambda i: 'Sensory' in i)].groupby('child_key').first()
 
+    pop = pd.DataFrame(columns=['child_key', 'set', 'gender', 'age',
+                                'ados_total', 'ados_sa', 'ados_rrb', 'ados_d2', 'ados_d4',
+                                'cognitive', 'pls',
+                                'abcs_irritability', 'abcs_social_withdrawal', 'abcs_hyperactivity_noncompliance', 'abcs_stereotypic_behavior', 'abcs_inappropriate_speech',
+                                'abas_gac', 'abas_concept', 'abas_social', 'abas_practical',
+                                'sensory_seeking', 'sensory_avoiding', 'sensory_sensitivity', 'sensory_registration'])
+    cids = merged['child_key'].unique()
+    for cid in cids:
+        if cid not in ADOS.index:
+            continue
+        ados = ADOS.loc[cid]
+        total, sa, rrb, d2, d4 = ados['x2'], ados['x0'], ados['x1'], ados['x3'], ados['x4'] if 'Toddlers' not in ados['repeat_instrument'] else ados['x5']
+        cog = COG.loc[cid]['x1'] if cid in cog_trn.index else np.nan
+        pls = PLS.loc[cid]['x0'] if cid in pls_trn.index else np.nan
+        irritability, social_withdrawal, hyperactivity_noncompliance, stereotypic_behavior, inappropriate_speech = np.nan, np.nan, np.nan, np.nan, np.nan
+        if cid in ABCS.index:
+            abcs = ABCS.loc[cid]
+            irritability, social_withdrawal, hyperactivity_noncompliance, stereotypic_behavior, inappropriate_speech = abcs['x0'], abcs['x1'], abcs['x2'], abcs['x3'], abcs['x4']
+        gac, concept, social, practical = np.nan, np.nan, np.nan, np.nan
+        if cid in ABAS.index:
+            abas = ABAS.loc[cid]
+            gac, concept, social, practical = abas['x0'], abas['x1'], abas['x2'], abas['x3']
+        seeking, avoiding, sensitivity, registration = np.nan, np.nan, np.nan, np.nan
+        if cid in SENSORY.index:
+            sensory = SENSORY.loc[cid]
+            seeking, avoiding, sensitivity, registration = sensory['x0'], sensory['x1'], sensory['x2'], sensory['x3']
+        set = ados['group']
+        age = ados['age_years']
+        gender = ados['gender']
+        # add row to pop:
+        pop.loc[pop.shape[0]] = cid, set, gender, age, \
+                                total, sa, rrb, d2, d4, cog, pls, \
+                                irritability, social_withdrawal, hyperactivity_noncompliance, stereotypic_behavior, inappropriate_speech, \
+                                gac, concept, social, practical, \
+                                seeking, avoiding, sensitivity, registration
+    modules_mapper = {'Abc Questionnaire': 'ABC',
+                      'Abas Questionnaire 0-5': 'ABAS',
+                      'Cognitive': 'Cognitive',
+                      'Infant Sensory Profile': 'Sensory',
+                      'Sensory Profile New': 'Sensory',
+                      'ADOS Toddlers Module': 'ADOS',
+                      'ADOS Module 1': 'ADOS',
+                      'ADOS Module 2': 'ADOS',
+                      'ADOS Module 3': 'ADOS',
+                      'PLS 4': 'PLS',
+                      'Abas Questionnaire 5-21': 'ABAS'}
+    merged['module'] = merged['repeat_instrument'].apply(lambda i: modules_mapper[i])
     preds = pd.read_csv(r'\\ac-s1\Data\Autism Center\Users\TalBarami\videos_qa\qa_processed.csv')
-    preds['human_length'] = (preds['human_end'] - preds['human_start']) / (preds['fps'] * preds['length_seconds']) * 100
+    preds = preds[preds['jordi_annotation'] != 'NoAction']
     preds['jordi_length'] = (preds['jordi_end'] - preds['jordi_start']) / (preds['fps'] * preds['length_seconds']) * 100
-    g1 = preds[preds['qa_hadas'] != 'NoAction'].groupby(['video']).agg({'child_id': 'count', 'length_seconds': 'first', 'human_length': 'sum', 'jordi_length': 'sum'})
-    g2 = preds[preds['jordi_annotation'] != 'NoAction'].groupby(['video']).agg({'child_id': 'count', 'length_seconds': 'first', 'human_length': 'sum', 'jordi_length': 'sum'})
-    grp = pd.merge(g1, g2, on='video', how='inner').reset_index()[['video', 'child_id_x', 'child_id_y', 'length_seconds_x', 'human_length_x', 'jordi_length_x']]
-    grp.columns = ['video', 'human_count', 'jordi_count', 'duration', 'human_length', 'jordi_length']
-    grp['human_count'] = grp['human_count'] / grp['duration'] * 60
-    grp['jordi_count'] = grp['jordi_count'] / grp['duration'] * 60
-    grp['diff_count'] = np.abs(grp['human_count'] - grp['jordi_count'])
-    grp['diff_length'] = np.abs(grp['human_length'] - grp['jordi_length'])
+    grp = preds.groupby(['video']).agg({'child_id': 'count', 'length_seconds': 'first', 'jordi_length': 'sum'}).reset_index()
+    grp.columns = ['video', 'count', 'video_duration', 'relative_length']
+    grp['count_per_minute'] = grp['count'] / grp['video_duration'] * 60
+    grp['video_date'] = grp['video'].apply(lambda v: pd.to_datetime(v.split('_')[-3]))
     grp['child_key'] = grp['video'].apply(lambda v: v.split('_')[0]).astype(int)
-    df_preds = pd.merge(pop, grp, on='child_key', how='left').dropna()
-    df_preds['ados_total'] = df_preds['ados_total'].astype(float)
-    df_preds['ados_sa'] = df_preds['ados_sa'].astype(float)
-    df_preds['ados_rrb'] = df_preds['ados_rrb'].astype(float)
-    df_preds['cognitive'] = df_preds['cognitive'].astype(float)
+    df_preds_all = pd.merge(grp, merged, on='child_key', how='inner')
+    df_preds_all['date_diff'] = np.abs((df_preds_all['video_date'] - df_preds_all['assessment_date']).dt.days)
+    idxs = df_preds_all.groupby(['video', 'module'])['date_diff'].idxmin().values
+    df_preds = df_preds_all.loc[idxs]
+
+    df_pop = pd.DataFrame(columns=['child_key', 'set', 'gender', 'age_years', 'age_days',
+                                   'video', 'video_date', 'smm_count', 'smm_length', 'video_duration', 'smm_count_per_minute', 'smm_relative_length',
+                                   'ados_date', 'ados_total', 'ados_sa', 'ados_rrb', 'ados_d2', 'ados_d4',
+                                   'cognitive_date', 'cognitive', 'pls_date', 'pls',
+                                   'abcs_date', 'abcs_irritability', 'abcs_social_withdrawal', 'abcs_hyperactivity_noncompliance', 'abcs_stereotypic_behavior', 'abcs_inappropriate_speech',
+                                   'abas_date', 'abas_gac', 'abas_concept', 'abas_social', 'abas_practical',
+                                   'sensory_date', 'sensory_seeking', 'sensory_avoiding', 'sensory_sensitivity', 'sensory_registration'])
+    for g, group in df_preds.groupby('video'):
+        old_row = group.iloc[0]
+        new_row = {'child_key': old_row['child_key'], 'set': old_row['group'], 'gender': old_row['gender'], 'age_years': old_row['age_years'], 'age_days': old_row['age_days'],
+                   'video': g, 'video_date': old_row['video_date'], 'smm_count': old_row['count'], 'smm_relative_length': old_row['relative_length'], 'video_duration': old_row['video_duration'],
+                   'smm_count_per_minute': old_row['count_per_minute']}
+        for _, row in group.iterrows():
+            module = row['module']
+            if module == 'ADOS':
+                new_row['ados_date'] = row['assessment_date']
+                new_row['ados_total'] = row['x2']
+                new_row['ados_sa'] = row['x0']
+                new_row['ados_rrb'] = row['x1']
+                new_row['ados_d2'] = row['x3']
+                new_row['ados_d4'] = row['x4'] if 'Toddlers' not in row['repeat_instrument'] else row['x5']
+            elif module == 'Cognitive':
+                new_row['cognitive_date'] = row['assessment_date']
+                new_row['cognitive'] = row['x1']
+            elif module == 'PLS':
+                new_row['pls_date'] = row['assessment_date']
+                new_row['pls'] = row['x0']
+            elif module == 'ABC':
+                new_row['abcs_date'] = row['assessment_date']
+                new_row['abcs_irritability'] = row['x0']
+                new_row['abcs_social_withdrawal'] = row['x1']
+                new_row['abcs_hyperactivity_noncompliance'] = row['x2']
+                new_row['abcs_stereotypic_behavior'] = row['x3']
+                new_row['abcs_inappropriate_speech'] = row['x4']
+            elif module == 'ABAS':
+                new_row['abas_date'] = row['assessment_date']
+                new_row['abas_gac'] = row['x0']
+                new_row['abas_concept'] = row['x1']
+                new_row['abas_social'] = row['x2']
+                new_row['abas_practical'] = row['x3']
+            elif module == 'Sensory':
+                new_row['sensory_date'] = row['assessment_date']
+                new_row['sensory_seeking'] = row['x0']
+                new_row['sensory_avoiding'] = row['x1']
+                new_row['sensory_sensitivity'] = row['x2']
+                new_row['sensory_registration'] = row['x3']
+        df_pop = df_pop.append(new_row, ignore_index=True)
+    df_pop.to_csv(r'Z:\Users\TalBarami\jordi_population.csv', index=False)
+
 
     def annotate(ax, data, x, y, fontsize, kappa=None):
         slope, intercept, rvalue, pvalue, stderr = scipy.stats.linregress(x=data[x], y=data[y])
@@ -574,30 +649,57 @@ if __name__ == '__main__':
         text = f'r={rvalue :.2f}\n{p}\nRMSE={rmse:.2f}'
         if kappa is not None:
             text += f'\n$\\kappa$={kappa:.2f}'
-        ax.text(.7, .1, text, transform=ax.transAxes, fontsize=fontsize,
+        ax.text(.7, .85, text, transform=ax.transAxes, fontsize=fontsize,
                 bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
 
-    def gen_graph(df, x_col, y_col, hue_col, title, xlabel, ylabel, perc=False):
+
+    def gen_graph(df, x_col, y_col, hue_col, xlabel, ylabel, perc=False):
+        print(f'Plotting: {x_col} vs {y_col}')
         fig, ax = plt.subplots()
         fig.set_size_inches((6, 6))
-        m, n = df[x_col].max(), df[y_col].max()
-        # k = max(m, n) * 1.05
-        m *= 1.05
-        n *= 1.05
+        # if df[x_col].dtype == 'object':
+        #     xlim = None
+        # else:
+        df[x_col] = df[x_col].astype(float)
+        df[y_col] = df[y_col].astype(float)
+        m, n = df[x_col].min(), df[x_col].max()
+        xlim = (m - 0.05 * (n - m), n + 0.05 * (n - m))
+        k, l = df[y_col].min(), df[y_col].max()
+        ylim = (k - 0.05 * (l - k), l + 0.05 * (l - k))
         sns.scatterplot(data=df, x=x_col, y=y_col, hue=hue_col, ax=ax)
-        annotate(ax, df, x_col, y_col, fontsize=12)
-        # ax.plot((0, k), (0, k), color='gray', linestyle='--')
-        ax.set(title=title, xlabel=xlabel, ylabel=ylabel, xlim=(0, m), ylim=(0, n))
+        if df[x_col].dtype != 'object':
+            annotate(ax, df, x_col, y_col, fontsize=12)
+            r_val, p_val = stats.pearsonr(df[x_col], df[y_col])
+            print(f'Correlation between {x_col} and {y_col}: {r_val:.3f}, p={p_val:.3f}')
+        # add linear fit:
+        sns.regplot(data=df, x=x_col, y=y_col, ax=ax, scatter=False)
+        ax.set(xlabel=xlabel, ylabel=ylabel, xlim=xlim, ylim=ylim)
         if perc:
-            ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
         fig.tight_layout()
         fig.savefig(f'resources/figs/corr_{x_col}_{y_col}.png', dpi=300)
         plt.show()
-        r_val, p_val = stats.pearsonr(df[x_col], df[y_col])
-        print(f'Correlation between {x_col} and {y_col}: {r_val:.3f}, p={p_val:.3f}')
 
-    for col in ['age', 'ados_total', 'ados_sa', 'cognitive']:
-        cap_col = col[0].upper() + col[1:]
-        gen_graph(df_preds, col, 'jordi_count', 'gender', 'Actions per minute', cap_col, 'Actions per minute')
-        gen_graph(df_preds, col, 'jordi_length', 'gender', 'Percentage of time with SMMs', cap_col, 'Percentage of time with SMMs', perc=True)
+    df_test = df_pop[df_pop['set'] == 'test']
+    label_map = {'age_years': 'Age Years', 'ados_rrb': 'ADOS RRB', 'ados_sa': 'ADOS SA', 'cognitive': 'Cognitive',
+                 'pls': 'PLS', 'abcs_irritability': 'ABC Irritability', 'abcs_social_withdrawal': 'ABC Social Withdrawal',
+                 'abcs_hyperactivity_noncompliance': 'ABC Hyperactivity', 'abcs_stereotypic_behavior': 'ABC Stereotypic Behavior',
+                 'abcs_inappropriate_speech': 'ABC Inappropriate Speech', 'abas_gac': 'ABAS GAC', 'abas_concept': 'ABAS Concept',
+                 'abas_social': 'ABAS Social', 'abas_practical': 'ABAS Practical', 'sensory_seeking': 'Sensory Seeking',
+                 'sensory_avoiding': 'Sensory Avoiding', 'sensory_sensitivity': 'Sensory Sensitivity',
+                 'sensory_registration': 'Sensory Registration'}
+    for col in ['age_years', 'ados_rrb', 'ados_sa', 'cognitive', 'pls',
+                'abcs_irritability', 'abcs_social_withdrawal', 'abcs_hyperactivity_noncompliance', 'abcs_stereotypic_behavior', 'abcs_inappropriate_speech',
+                'abas_gac', 'abas_concept', 'abas_social', 'abas_practical',
+                'sensory_seeking', 'sensory_avoiding', 'sensory_sensitivity', 'sensory_registration']:
+        _df = df_test[df_test[col].notna()]
+        cap_col = label_map[col]
+        gen_graph(df_test, col, 'smm_count_per_minute', None, cap_col, 'SMMs per minute')
+        gen_graph(df_test, col, 'smm_relative_length', None, cap_col, 'Percentage of time with SMMs', perc=True)
+    # scatterplot for gender, use jitter:
+    fig, ax = plt.subplots()
+    fig.set_size_inches((6, 6))
+    df['jittered_gender'] = df_test['gender'].apply(lambda g: 1 if g == 'Male' else 0) + np.random.uniform(-0.2, 0.2, len(df_test))
+    ax.set(xlabel='Sex', ylabel='SMMs per minute')
+
     print()

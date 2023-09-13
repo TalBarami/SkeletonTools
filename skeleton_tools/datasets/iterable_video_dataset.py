@@ -30,10 +30,10 @@ import torch
 
 
 class IterableVideoDataset(IterableDataset):
-    def __init__(self, video_path, device='cuda'):
+    def __init__(self, video_path, device=None):
         self.video_path = video_path
         self.cap = None
-        self.device = torch.device(device)
+        self.device = device
 
     def __iter__(self):
         self.cap = cv2.VideoCapture(self.video_path)
@@ -44,13 +44,23 @@ class IterableVideoDataset(IterableDataset):
         if not ret:
             self.cap.release()
             raise StopIteration
-        return torch.from_numpy(frame).to(self.device)
+        if self.device is not None:
+            frame = torch.from_numpy(frame).to(self.device)
+        else:
+            return frame
+
+    # def _pad(self, frame):
+    #     h, w = frame.shape[1:]
+    #     pad_h = (self.size_divisible - h % self.size_divisible) % self.size_divisible
+    #     pad_w = (self.size_divisible - w % self.size_divisible) % self.size_divisible
+    #     frame = torch.nn.functional.pad(frame, (0, pad_w, 0, pad_h))
+    #     return frame
 
 
 
 if __name__ == '__main__':
     dataset = IterableVideoDataset(r'Z:\Users\TalBarami\models_outputs\videos\666661888_ADOS_Clinical_190218_1220_4_Facial_None_None.mp4')
-    dataloader = DataLoader(dataset, batch_size=32, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=32)
 
     for batch in dataloader:
         print(batch.shape)

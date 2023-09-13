@@ -82,7 +82,8 @@ class PyfeatDataExtractor(VisualizerDataExtractor):
         cids[cids == 255] = -1
         result = {'landmarks': landmarks, 'landmarks_scores': landmarks_scores, 'aus': data['aus'], 'emotions': data['emotions'],
                   'boxes': boxes, 'face_boxes': boxes, 'rotations': data['rotations'], 'child_ids': cids,
-                  'resolution': np.array(data['resolution']) * self.scale, 'fps': data['fps'], 'frame_count': data['frame_count'], 'duration_seconds': data['length'],
-                  'video_path': data['video_path'], 'filename': data['filename'], 'feat_path': data['feat_path'], 'skip_frames': data['skip_frames']}
+                  'resolution': (np.array(data['resolution']) * self.scale).astype(int) , 'fps': data['fps'], 'frame_count': data['frame_count'], 'duration_seconds': data['length'],
+                  'video_path': data['video_path'], 'filename': data['filename'], 'feat_path': data['feat_path'], 'skip_frames': data['skip_frames'],
+                  'au_cols': data['au_cols'], 'emotion_cols': data['emotion_cols'], 'rotation_cols': data['rotation_cols'], 'landmark_cols': data['landmark_cols'], 'face_cols': data['face_cols']}
         self._assign_labels(result, cids)
         return result

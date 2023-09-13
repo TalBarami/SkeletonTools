@@ -21,7 +21,6 @@ REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body 
                        'Playing with object', 'Jumping in place', 'Legs movement', 'Feeling texture', 'Other', 'NoAction']
 
 EMOTION_COLS = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise', 'neutral']
-AU_COLS = ['AU01', 'AU02', 'AU04', 'AU05', 'AU06', 'AU07', 'AU09', 'AU10', 'AU11', 'AU12', 'AU14', 'AU15', 'AU17', 'AU20', 'AU23', 'AU24', 'AU25', 'AU26', 'AU28', 'AU43']
 LANDMARK_COLS = [i for s in list(zip([f'x_{i}' for i in range(68)], [f'y_{i}' for i in range(68)])) for i in s]
 FACE_COLS = ['FaceRectX', 'FaceRectY', 'FaceRectWidth', 'FaceRectHeight', 'FaceScore']
 ROTATION_COLS = ['Pitch', 'Roll', 'Yaw']

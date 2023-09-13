@@ -19,7 +19,7 @@ from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.openpose_layouts.face import PYFEAT_FACIAL
 from skeleton_tools.skeleton_visualization.data_prepare.data_extract import MMPoseDataExtractor, PyfeatDataExtractor
 from skeleton_tools.skeleton_visualization.data_prepare.writer import VideoWriter, ImageWriter
-from skeleton_tools.utils.constants import AU_COLS, EMOTION_COLS
+from skeleton_tools.utils.constants import EMOTION_COLS
 from skeleton_tools.utils.tools import read_pkl, init_logger
 
 
@@ -113,7 +113,7 @@ def create_barni(video_path, pkl_path, out_path, start=None, end=None, scale=1):
     child_aus = np.array([data['aus'][c, i] for i, c in enumerate(data['child_ids'])])
     child_emotions = np.array([data['emotions'][c, i] for i, c in enumerate(data['child_ids'])])
 
-    t = 0.985
+    t = 0.9
     child_aus[child_face_score < t] = np.nan
     child_emotions[child_face_score < t] = np.nan
     child_aus = interpolate(child_aus)
@@ -122,8 +122,8 @@ def create_barni(video_path, pkl_path, out_path, start=None, end=None, scale=1):
 
     local_painters = [GraphPainter(extractor.graph_layout, epsilon=t, alpha=0.4), BoxPainter(), CustomTextPainter((50, 50), 'rotations', child_only=True)]
     global_painters = [GlobalPainter(p) for p in local_painters]
-    graphs = [DynamicPolar('AUs', child_aus, AU_COLS, height=height // 2, width=width // 2, filters=()),
-              DynamicSignal('Emotions', child_emotions, EMOTION_COLS,
+    graphs = [DynamicPolar('AUs', child_aus, data['au_cols'], height=height // 2, width=width // 2, filters=()),
+              DynamicSignal('Emotions', child_emotions, data['emotion_cols'],
                             'Time', 'Score',
                             window_size=1000,
                             height=height // 2,
