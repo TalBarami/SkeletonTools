@@ -103,13 +103,13 @@ class SkeletonVisualizer(ABC):
         #         cv2.circle(img, (x, y), jsize, jcolor, thickness=2)
         return img
 
-    def draw_skeletons(self, frame, i, skeleton_data):
+    def draw_skeletons(self, frame, i, skeleton_data,  child_detect=True):
         return self._draw_skeletons(frame,
                                     skeleton_data['keypoint'][i], skeleton_data['keypoint_score'][i],
                                     resolution=(skeleton_data['width'], skeleton_data['height']), pids=skeleton_data['pids'][i],
-                                    child_id=skeleton_data['child_ids'][i] if 'child_ids' in skeleton_data.keys() else None,
-                                    child_box=skeleton_data['child_bbox'][i] if 'child_bbox' in skeleton_data.keys() else None,
-                                    detection_conf=skeleton_data['child_detected'][i] if 'child_detected' in skeleton_data.keys() else None,
+                                    child_id=skeleton_data['child_ids'][i] if 'child_ids' in skeleton_data.keys() and child_detect else None,
+                                    child_box=skeleton_data['child_bbox'][i] if 'child_bbox' in skeleton_data.keys() and child_detect else None,
+                                    detection_conf=skeleton_data['child_detected'][i] if 'child_detected' in skeleton_data.keys() and child_detect else None,
                                     saliency=skeleton_data['saliency'][i] if 'saliency' in skeleton_data.keys() else None)
 
     def create_skeleton_video(self, skeleton_data, out_path):
@@ -195,7 +195,9 @@ class SkeletonVisualizer(ABC):
         return frame
 
     def sample_frames(self, video_path, skeleton_data, frame_idxs, out_dir):
-        fps, frames_count, (width, height), kp, c, pids, child_ids, detections, boxes = self.prepare(video_path, skeleton_data)
+        skeleton_data = self.prepare(video_path, skeleton_data)
+        height, width = skeleton_data['height'], skeleton_data['width']
+        kp, c, child_ids = skeleton_data['keypoint'], skeleton_data['keypoint_score'], skeleton_data['child_ids']
         cap = cv2.VideoCapture(video_path)
         white = np.ones((height, width, 4)) * 255
 
@@ -205,9 +207,9 @@ class SkeletonVisualizer(ABC):
             frame = np.concatenate((frame, np.zeros((height, width, 1))), axis=2)
             frame[:, :, 3] = (255 * (frame[:, :, :3] != 255).any(axis=2)).astype(np.uint8)
             if ret:
-                skeleton = self.draw_skeletons(np.copy(white), kp[i], c[i], pids=np.ones(kp.shape[0], dtype='uint8') * 0)
+                skeleton = self.draw_skeletons(np.copy(white), i, skeleton_data, child_detect=False)
                 skeleton = self.to_image(skeleton)
-                skeleton_child_detect = self.draw_skeletons(np.copy(white), kp[i], c[i], child_id=child_ids[i])
+                skeleton_child_detect = self.draw_skeletons(np.copy(white), i, skeleton_data, child_detect=True)
                 skeleton_child_detect = self.to_image(skeleton_child_detect)
                 cv2.imwrite(osp.join(out_dir, f'org_{i}.png'), frame)
                 cv2.imwrite(osp.join(out_dir, f'skeleton_{i}.png'), skeleton)

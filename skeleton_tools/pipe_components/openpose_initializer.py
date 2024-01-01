@@ -101,7 +101,7 @@ class OpenposeInitializer:
         openpose_output_path = osp.join(process_dir, 'openpose')
 
         try:
-            resolution, fps, frame_count, length = get_video_properties(src_path, method='cv2')
+            resolution, fps, frame_count, length = get_video_properties(src_path)
             if self.as_img_dir:
                 img_out_path = osp.join(process_dir, 'img_dirs')
                 self._video2img(src_path, img_out_path)
@@ -130,7 +130,8 @@ class OpenposeInitializer:
             self.logger.error(f'Error creating skeleton from {src_path}: {e}')
             raise e
         finally:
-            shutil.rmtree(process_dir)
+            if osp.exists(process_dir):
+                shutil.rmtree(process_dir)
 
     def openpose_to_json(self, openpose_dir):
         file_names = [osp.join(openpose_dir, f) for f in os.listdir(openpose_dir) if osp.isfile(osp.join(openpose_dir, f)) and f.endswith('json')]

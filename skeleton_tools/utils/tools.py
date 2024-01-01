@@ -121,7 +121,7 @@ def take_subclip(video_path, start_time, end_time, fps, out_path):
         .run()
 
 
-def get_video_properties(filename, method='ffmpeg'):
+def get_video_properties(filename):
 
     try:
         vinf = ffmpeg.probe(filename)
@@ -148,6 +148,13 @@ def get_video_properties(filename, method='ffmpeg'):
             resolution = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
             fps = cap.get(cv2.CAP_PROP_FPS)
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if frame_count > 6e5:
+                frame_count = 0
+                while True:
+                    ret, _ = cap.read()
+                    if not ret:
+                        break
+                    frame_count += 1
             length = frame_count / fps
         except Exception as e:
             raise e
@@ -247,6 +254,21 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
+
+def convert_video(video_path, out_path):
+    cap = cv2.VideoCapture(video_path)
+    ret, frame = cap.read()
+    height, width, _ = frame.shape
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    print(f'Found fps: {fps}')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    while ret:
+        writer.write(frame)
+        ret, frame = cap.read()
+    cap.release()
+    writer.release()
+
 
 if __name__ == '__main__':
     db = scan_db()

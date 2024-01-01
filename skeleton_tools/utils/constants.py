@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.colors as mcolors
 from os import path as osp
 import pandas as pd
@@ -8,12 +10,13 @@ from skeleton_tools.openpose_layouts.hand import HAND_LAYOUT
 
 NET_NAME = 'JORDI'
 NET_FULLNAME = 'Joint Observation RRB Deep-learning Instrument'
-REMOTE_STORAGE = osp.join(r'\\ac-s1', 'Data', 'Autism Center')
+REMOTE_STORAGE = r'Z:'
 
-OPENPOSE_ROOT = r'C:\research\openpose'
-MMACTION_ROOT = r'C:\research\mmaction2'
-MMLAB_ENV_PATH = r'C:\Users\owner\anaconda3\envs\mmlab\python.exe'
-DB_PATH = osp.join(REMOTE_STORAGE, r'Users\TalBarami\NAS_database_final.csv')
+OPENPOSE_ROOT = r'D:\repos\openpose-1.7.0-binaries-win64-gpu-python3.7-flir-3d_recommended'
+MMACTION_ROOT = r'D:\repos\mmaction2'
+MMLAB_ENV_PATH = r'C:\Users\owner\anaconda3\envs\open-mmlab\python.exe'
+DB_PATH = osp.join(REMOTE_STORAGE, r'recordings')
+REDCAP_PATH = osp.join(REMOTE_STORAGE, r'recordings\redcap_db_230906.csv')
 ANNOTATIONS_PATH = osp.join(REMOTE_STORAGE, r'Users\TalBarami\lancet_submission_data\annotations\labels.csv')
 
 REAL_DATA_MOVEMENTS = ['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
@@ -41,7 +44,9 @@ EPSILON = 1e-4
 pd.options.display.max_columns = 99
 
 def read_db():
-    _db = pd.read_csv(DB_PATH)
+    dbs = [f for f in os.listdir(DB_PATH) if f[:3] == 'db_' and f.endswith('.csv')]
+    # take the file with the highest date in #yymmdd format
+    _db = pd.read_csv(osp.join(DB_PATH, sorted(dbs, key=lambda x: x.split('_')[-1].split('.')[0])[-1]))
     scores = pd.read_csv(REDCAP_PATH, parse_dates=['date_of_birth', 'assessment_date'], infer_datetime_format=True)
     scores['age_days'] = scores['assessment_date'] - scores['date_of_birth']
     scores['age_years'] = scores['age_days'].dt.days / 365.25
