@@ -268,7 +268,6 @@ class OpenposeInitializer:
             'fps': json_file['fps'],
             'length_seconds': json_file['length_seconds'],
             'frame_count': json_file['frame_count'],
-            'adjust': json_file['adjust'],
             'total_frames': len(json_file['data']),
         }
         if label is not None and label_index is not None:
