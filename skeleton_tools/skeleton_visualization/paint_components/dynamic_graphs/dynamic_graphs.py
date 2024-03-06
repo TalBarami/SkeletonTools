@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import _pylab_helpers
+from matplotlib.ticker import FuncFormatter
 from scipy.signal import savgol_filter
 from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 
@@ -32,12 +33,19 @@ class DynamicGraph(ABC):
     def plot(self, i):
         pass
 
+def format_time(x, pos):
+    x = x / 25
+    minutes = int(x // 60)
+    seconds = int(x % 60)
+    return f'{minutes:02d}:{seconds:02d}'
+
 class DynamicSignal(DynamicGraph):
-    def __init__(self, title, data, legend, xlabel, ylabel, window_size, height, width=None, filters=(), dpi=128):
+    def __init__(self, title, data, legend, xlabel, ylabel, window_size, height, width=None, filters=(), dpi=128, xlabel_format=None):
         self.title, self.legend, self.xlabel, self.ylabel = title, legend, xlabel, ylabel
         self.window_size = window_size
         self.radius = self.window_size // 2
         self.ticks = 50
+        self.xlabel_format = xlabel_format
         pad = np.zeros((self.radius, data.shape[1]))
         super().__init__(data=np.concatenate((pad, data, pad), axis=0), height=height, width=width, filters=filters, dpi=dpi)
 
@@ -48,9 +56,12 @@ class DynamicSignal(DynamicGraph):
         y = self.data[i:i+2*self.radius+1]
         ax.plot(x, y)
         ax.set(title=self.title, xlabel=self.xlabel, xlim=(mn, mx), ylabel=self.ylabel, ylim=self.ylim)
+        if self.xlabel_format == 'time':
+            ax.xaxis.set_major_formatter(FuncFormatter(format_time))
         ax.axvline(x=i, color='r', linestyle='dotted')
         ax.grid()
-        ax.legend(self.legend, loc='upper right')
+        if self.legend:
+            ax.legend(self.legend, loc='upper right')
         return fig2np(fig)
 
 class DynamicBar(DynamicGraph):

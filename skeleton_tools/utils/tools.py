@@ -45,6 +45,10 @@ def save_config(config, out):
     with open(out.replace('\\', '/'), 'w') as fp:
         OmegaConf.save(config=config, f=fp.name)
 
+def load_config(file):
+    with open(file.replace('\\', '/'), 'r') as fp:
+        return OmegaConf.load(fp.name)
+
 def init_logger(log_name, log_path=None):
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
@@ -268,11 +272,3 @@ def convert_video(video_path, out_path):
         ret, frame = cap.read()
     cap.release()
     writer.release()
-
-
-if __name__ == '__main__':
-    db = scan_db()
-    asmt = db.groupby('assessment').first().reset_index()[['assessment', 'child_id', 'date', 'type']]
-    print(1)
-    db2 = scan_db(properties=True)
-    print(2)

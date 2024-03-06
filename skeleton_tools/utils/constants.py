@@ -43,10 +43,12 @@ STEP_SIZE = 30
 EPSILON = 1e-4
 pd.options.display.max_columns = 99
 
-def read_db():
-    dbs = [f for f in os.listdir(DB_PATH) if f[:3] == 'db_' and f.endswith('.csv')]
-    # take the file with the highest date in #yymmdd format
-    _db = pd.read_csv(osp.join(DB_PATH, sorted(dbs, key=lambda x: x.split('_')[-1].split('.')[0])[-1]))
+def read_db(file_path=None):
+    if file_path is None:
+        dbs = [f for f in os.listdir(DB_PATH) if f[:3] == 'db_' and f.endswith('.csv')]
+        _db = pd.read_csv(osp.join(DB_PATH, sorted(dbs, key=lambda x: x.split('_')[-1].split('.')[0])[-1]))
+    else:
+        _db = pd.read_csv(file_path)
     scores = pd.read_csv(REDCAP_PATH, parse_dates=['date_of_birth', 'assessment_date'], infer_datetime_format=True)
     scores['age_days'] = scores['assessment_date'] - scores['date_of_birth']
     scores['age_years'] = scores['age_days'].dt.days / 365.25

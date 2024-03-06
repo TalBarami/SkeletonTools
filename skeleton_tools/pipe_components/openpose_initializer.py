@@ -33,18 +33,15 @@ class OpenposeInitializer:
         else:
             self.logger = logger
         self.layout = openpose_layout
-        self.C = in_channels
-        self.T = length
-        self.V = len(self.layout)
-        self.num_person_in = num_person_in
-        self.num_person_out = num_person_out
+        self.C, self.T, self.V = in_channels, length, len(self.layout)
+        self.num_person_in, self.num_person_out = num_person_in, num_person_out
         self.open_pose_path = open_pose_path
         self.as_img_dir = as_img_dir
         self.gpu_id = gpu_id
 
     def _video2img(self, video_path, out_path):
         name = osp.splitext(osp.basename(video_path))[0]
-        self.logger.info(f'Converting video to image dir.')
+        self.logger.info(f'Converting video to image dir. Results will be written to: {out_path}')
         init_directories(out_path)
         cap = cv2.VideoCapture(video_path)
         n = cap.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -52,11 +49,11 @@ class OpenposeInitializer:
         i, ret = 0, True
         while True:
             ret, frame = cap.read()
-            if ret:
-                cv2.imwrite(osp.join(out_path, f'{name}_{str(i).zfill(d)}.jpg'), frame)
-                i += 1
-            else:
+            if not ret:
                 break
+            cv2.imwrite(osp.join(out_path, f'{name}_{str(i).zfill(d)}.jpg'), frame)
+            i += 1
+        cap.release()
 
     def _exec_openpose(self, src_path, skeleton_dst, source_type=SkeletonSource.VIDEO):
         init_directories(skeleton_dst)
@@ -105,13 +102,13 @@ class OpenposeInitializer:
             if self.as_img_dir:
                 img_out_path = osp.join(process_dir, 'img_dirs')
                 self._video2img(src_path, img_out_path)
+                if frame_count is None or length is None:
+                    frame_count = len(os.listdir(img_out_path))
+                    length = frame_count / fps
                 self._exec_openpose(img_out_path, openpose_output_path, source_type=SkeletonSource.IMAGE)
             else:
                 self._exec_openpose(src_path, openpose_output_path, source_type=source_type)
             data = self.openpose_to_json(openpose_output_path)
-            adj = int(frame_count - len(data))
-            if adj != 0:
-                self.logger.warning(f'Skeleton {basename} requires adjustments: video={frame_count}, T={len(data)}')
             skeleton = {
                 'name': basename,
                 'video_path': src_path,
@@ -119,7 +116,6 @@ class OpenposeInitializer:
                 'fps': fps,
                 'frame_count': frame_count,
                 'length_seconds': length,
-                'adjust': adj,
                 'data': data,
             }
             if result_skeleton_dir:

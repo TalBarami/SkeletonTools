@@ -46,8 +46,7 @@ class IterableVideoDataset(IterableDataset):
             raise StopIteration
         if self.device is not None:
             frame = torch.from_numpy(frame).to(self.device)
-        else:
-            return frame
+        return frame
 
     # def _pad(self, frame):
     #     h, w = frame.shape[1:]
