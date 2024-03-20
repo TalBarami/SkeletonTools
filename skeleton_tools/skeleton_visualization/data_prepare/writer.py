@@ -3,7 +3,6 @@ from os import path as osp
 
 import cv2
 import numpy as np
-from skimage.color import rgba2rgb
 
 
 class Writer(ABC):

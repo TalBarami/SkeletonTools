@@ -1,15 +1,13 @@
 from abc import ABC, abstractmethod
 
-import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
+import numpy as np
 from matplotlib import _pylab_helpers
 from matplotlib.ticker import FuncFormatter
 from scipy.signal import savgol_filter
-from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import GraphPainter
 from skeleton_tools.skeleton_visualization.paint_components.paint_utils import fig2np
 
 plt.rcParams.update({'font.size': 10})

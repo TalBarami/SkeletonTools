@@ -74,29 +74,34 @@ class ScaleAbsPainter(GlobalPainter):
         return frame
 
 class BlurPainter(GlobalPainter):
-    def __init__(self, data, active=True):
+    def __init__(self, data, radius=None, active=True):
         super().__init__(self)
-        self.active = active
         self.data = data
+        self.radius = radius
+        self.active = active
         face_boxes = self.data['face_boxes']
         blur_boxes = np.zeros_like(face_boxes)
-        self.data['blur_boxes'] = blur_boxes
-
         last_boxes = np.zeros((face_boxes.shape[0], *face_boxes.shape[2:]))
+        last_boxes_idx = np.zeros(face_boxes.shape[0])
         for f in range(face_boxes.shape[1]):
             frame_boxes = face_boxes[:, f].tolist()
             frame_boxes = sorted(frame_boxes, key=cmp_to_key(self.compare))
             for j, b in enumerate(frame_boxes):
                 if np.sum(b) > 0:
                     last_boxes[j] = b
+                    last_boxes_idx[j] = f
+                if f - last_boxes_idx[j] > 5:
+                    continue
                 blur_boxes[j, f] = last_boxes[j]
-        for f in reversed(range(face_boxes.shape[1])):
-            frame_boxes = blur_boxes[:, f]
-            for j, b in enumerate(frame_boxes):
-                if np.sum(b) == 0:
-                    blur_boxes[j, f] = last_boxes[j]
-                else:
-                    last_boxes[j] = b
+        # for f in reversed(range(face_boxes.shape[1])):
+        #     frame_boxes = blur_boxes[:, f]
+        #     for j, b in enumerate(frame_boxes):
+        #         if np.sum(b) == 0:
+        #             blur_boxes[j, f] = last_boxes[j]
+        #         else:
+        #             last_boxes[j] = b
+        self.data['blur_boxes'] = blur_boxes
+
 
     def switch(self, active=None):
         if active is None:
@@ -110,8 +115,8 @@ class BlurPainter(GlobalPainter):
     def _paint(self, frame, data, frame_id):
         if self.active:
             boxes = self.data['blur_boxes'][:, frame_id]
-            for (c, r) in boxes:
-                r = max(r.max(), 0) #// 2
+            for (c, hw) in boxes:
+                r = hw.max() if self.radius is None else self.radius
                 frame = blur_area(frame, c, r)
         return frame
 

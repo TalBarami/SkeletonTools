@@ -1,26 +1,28 @@
+import traceback
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
+from os import path as osp
 
-import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from skeleton_tools.skeleton_visualization.data_prepare.reader import VideoReader, DefaultReader
-from skeleton_tools.skeleton_visualization.paint_components.dynamic_graphs.dynamic_graphs import DynamicPolar, DynamicSignal, DynamicSkeleton
-from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, ScaleAbsPainter, BlurPainter
-from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import LabelPainter, ScorePainter, BoxPainter, GraphPainter, CustomTextPainter
+import json
+
+from omegaconf import OmegaConf
 from tqdm import tqdm
-from os import path as osp
-import os
-from scipy.signal import savgol_filter
-from scipy.ndimage.interpolation import shift
-from concurrent.futures import ThreadPoolExecutor
-import traceback
 
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.openpose_layouts.face import PYFEAT_FACIAL
+from skeleton_tools.skeleton_visualization.components_loader import ComponentsLoader
 from skeleton_tools.skeleton_visualization.data_prepare.data_extract import MMPoseDataExtractor, PyfeatDataExtractor
+from skeleton_tools.skeleton_visualization.data_prepare.reader import VideoReader, DefaultReader
 from skeleton_tools.skeleton_visualization.data_prepare.writer import VideoWriter, ImageWriter
-from skeleton_tools.utils.constants import EMOTION_COLS
-from skeleton_tools.utils.tools import read_pkl, init_logger
+from skeleton_tools.skeleton_visualization.paint_components.dynamic_graphs.dynamic_graphs import DynamicPolar, DynamicSignal, DynamicSkeleton
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.base_painters import GlobalPainter, BlurPainter, ScaleAbsPainter
+from skeleton_tools.skeleton_visualization.paint_components.frame_painters.local_painters import BoxPainter, GraphPainter, CustomTextPainter
+from skeleton_tools.utils.tools import init_logger, load_config, init_directories, savgol_filter
+
+plt.switch_backend('agg')
 
 
 class VideoCreator:
@@ -104,9 +106,7 @@ def interpolate(seq):
     interpolated['interpolated'] = df.apply(lambda row: 1 if row.isna().any() else 0, axis=1)
     return interpolated[[x for x in range(n)]].to_numpy()
 
-
-def create_barni(video_path, pkl_path, out_path, start=None, end=None, scale=1):
-    _, ext = osp.splitext(video_path)
+def create_barni(cfg, out_path, start=None, end=None, scale=1):
     extractor = PyfeatDataExtractor(PYFEAT_FACIAL, scale=scale)
     data = extractor(pkl_path)
     child_face_score = np.array([data['landmarks_scores'][c, i] for i, c in enumerate(data['child_ids'])]).T[0]
@@ -133,87 +133,112 @@ def create_barni(video_path, pkl_path, out_path, start=None, end=None, scale=1):
     vc.create_video(video_path=video_path, data=data, out_path=out_path, start=start, end=end, unit='frame')
 
 
-def create_jordi(video_path, skeleton_path, predictions_path, out_path, start=None, end=None, scale=1):
+def create_jordi(cfg, out_path, start=None, end=None, scale=1):
     extractor = MMPoseDataExtractor(COCO_LAYOUT, scale=scale)
     data = extractor(skeleton_path, predictions_path)
     width, height = data['resolution']
     epsilon = 0.3
     # local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4), LabelPainter(), ScorePainter(), BoxPainter()]
     # local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=1.0, color=[(255, 128, 0), (0, 255, 128), (128, 0, 255)], child_only=False)]
-    local_painters = [GraphPainter(extractor.graph_layout, epsilon=epsilon, alpha=0.4, child_only=False)]
-    # global_painters = [ScaleAbsPainter(alpha=1.5, beta=6)] + [GlobalPainter(p) for p in local_painters]
-    global_painters = [BlurPainter(data)] + [GlobalPainter(p) for p in local_painters]
-    graphs = [DynamicSignal('Stereotypical Action', data['predictions'], ['Stereotypical'],
+    local_painters = [GraphPainter(extractor.graph_layout, epsilon=cfg.painters['local']['GraphPainter']['epsilon'], alpha=cfg.painters['local']['GraphPainter']['alpha'], child_only=cfg.painters['local']['GraphPainter']['child_only'])]
+    global_painters = [BlurPainter(data), ScaleAbsPainter(alpha=cfg.painters['global']['ScaleAbsPainter']['alpha'], beta=cfg.painters['global']['ScaleAbsPainter']['alpha'])] + [GlobalPainter(p) for p in local_painters]
+    graphs = [DynamicSignal(None, data['predictions'], None,
                             'Time', 'Score',
                             window_size=1000,
                             height=int(height * 0.5),
                             width=width,
-                            filters=()),
+                            filters=(),
+                            xlabel_format='time'),
               DynamicSkeleton(layout=extractor.graph_layout, epsilon=epsilon, data=data, child_only=True,
                               height=int(height * 0.5), width=width)]
-    # graphs = []
 
     vc = VideoCreator(global_painters=global_painters, local_painters=[], graphs=graphs, scale=scale)
     vc.create_video(video_path=video_path, data=data, out_path=out_path, start=start, end=end, unit='frame')
+
+def create_jordi_ann(cfg):
+    video_path, processed_dir, out_dir = cfg.paths.video, cfg.paths.processed, cfg.paths.output
+    name, ext = osp.splitext(osp.basename(video_path))
+    ann_file = osp.join(processed_dir, name, 'jordi', 'cv0.pth', f'{name}_annotations.csv')
+    if not osp.exists(ann_file):
+        print(f'Annotations for {name} do not exist.')
+    video_info = load_config(osp.join(processed_dir, name, 'jordi', 'cv0.pth', f'{name}_exec_info.yaml'))
+    df = pd.read_csv(ann_file)
+    df = df[df['movement'] == 'Stereotypical']
+    out_dir = osp.join(out_dir, f'{name}_Stereotypical')
+    init_directories(out_dir)
+    for i, row in tqdm(df.iterrows()):
+        start, end = max(0, int(row['start_frame']) - 200), min(video_info['properties']['frame_count'], int(row['end_frame']) + 200)
+        out_path = osp.join(out_dir, f'{name}_{start}_{end}{ext}')
+        create_jordi(cfg, out_path, start=start, end=end)
 
 
 if __name__ == '__main__':
     logger = init_logger('Visualizer')
     parser = ArgumentParser()
-    parser.add_argument("-video", "--video_path")
-    parser.add_argument("-pkl", "--pkl_path")
-    parser.add_argument("-pkl_pred", "--pkl_predictions_path")
-    parser.add_argument("-out", "--out_dir")
-    parser.add_argument("-s", "--start")
-    parser.add_argument("-t", "--end")
-    parser.add_argument('-j', '--jordi', action='store_true')
-    parser.add_argument('-b', '--barni', action='store_true')
-    parser.add_argument('-c', '--scale', type=int, default=1)
+    parser.add_argument('-cfg', '--config_path')
     args = parser.parse_args()
+    cfg = load_config(args.config_path)
+    cfg = OmegaConf.to_container(cfg)
+    logger.info(f'Visualizer initialized with config: {cfg}')
 
-    config_str = ''.join(f'\n\t{k}: {v}' for k,v in vars(args).items())
-    logger.info(f'Visualizer initialized with config:{config_str}')
-    name, ext = osp.splitext(osp.basename(args.video_path))
-    if args.jordi:
-        out_path = osp.join(args.out_dir, f'{name}_SMMs.avi')
-        logger.info(f'Creating Jordi video for {name}')
-        create_jordi(video_path=args.video_path, skeleton_path=args.pkl_path, predictions_path=args.pkl_predictions_path,
-                     out_path=out_path,
-                     start=args.start, end=args.end, scale=args.scale)
-    if args.barni:
-        out_path = osp.join(args.out_dir, f'{name}_Facial.mp4')
-        logger.info(f'Creating Barni video for {name}')
-        create_barni(video_path=args.video_path, pkl_path=args.pkl_path,
-                     out_path=out_path,
-                     start=args.start, end=args.end, scale=args.scale)
+    loader = ComponentsLoader(cfg)
+    data = loader.extract_data()
+    local_painters, global_painters = loader.create_painters(use_globals=cfg['painters']['use_globals'])
+    graphs = loader.create_graphs()
+    vc = VideoCreator(global_painters=global_painters, local_painters=local_painters, graphs=graphs, scale=1)
 
-    # create_barni('673950985_ADOS_ASD_061019_1038_4_Trim', start=1127, end=1155)
-    # create_barni('673950985_ADOS_ASD_061019_1038_4_Trim', start=1058, end=1076)
-    # create_jordi('666770197_Cognitive_Clinical_010120_1127_3')
-    # create_jordi('1007196724_ADOS_Clinical_190917_0000_2')
+    video_path, processed_dir, out_dir = cfg['paths']['video'], cfg['paths']['processed'], cfg['paths']['output']
+    name, ext = cfg['name'], cfg['ext']
+    model = cfg['model']['name']
+    mode = cfg['mode']
+    if mode['name'] == 'annotate':
+        ann_file = osp.join(processed_dir, name, 'jordi', 'cv0.pth', f'{name}_annotations.csv')
+        if not osp.exists(ann_file):
+            logger.error(f'Annotations for {cfg["name"]} do not exist.')
+        else:
+            video_info = load_config(osp.join(processed_dir, name, 'jordi', 'cv0.pth', f'{name}_exec_info.yaml'))
+            df = pd.read_csv(ann_file)
+            df = df[df['movement'] == 'Stereotypical'].reset_index(drop=True)
+            out_dir = osp.join(cfg['paths']['output'], f'{name}_{model}')
+            init_directories(out_dir)
+            for i, row in tqdm(df.iterrows()):
+                start, end = max(0, int(row['start_frame']) - 200), min(video_info['properties']['frame_count'], int(row['end_frame']) + 200)
+                out_path = osp.join(out_dir, f'{name}{ext}')
+                vc.create_video(video_path=cfg['paths']['video'], data=data, out_path=out_path, start=start, end=end, unit='frame')
+    elif mode['name'] == 'video':
+        start, end = (mode['start'], mode['end']) if 'start' in mode and 'end' in mode else (None, None)
+        out_path = osp.join(out_dir, f'{name}_{model}{ext}')
+        vc.create_video(video_path=cfg['paths']['video'], data=data, out_path=out_path, start=start, end=end, unit='frame')
 
-    # create_jordi('1018226485_ADOS_Control_210119_0929_4') # Tamar
-
-    # video_name = r'666770197_Cognitive_Clinical_010120_1127_3'
-    # jordi_dir = r'Z:\Users\TalBarami\jordi_cross_validation'
-    # out_dir = r'Z:\Users\TalBarami\vids'
-    # extractor = MMPoseDataExtractor(COCO_LAYOUT)
-    # model = [m for m in os.listdir(osp.join(jordi_dir, video_name, 'jordi')) if osp.isdir(osp.join(jordi_dir, video_name, 'jordi', m))][0]
-    # data = extractor(osp.join(jordi_dir, video_name, 'jordi', f'{video_name}.pkl'),
-    #                  osp.join(jordi_dir, video_name, 'jordi', model, f'{video_name}_predictions.pkl'))
-    # video_path = data['video_path']
-    # predictions = data['predictions']
-    # cap = cv2.VideoCapture(data['video_path'])
-    # # cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    # gp = GraphPainter(extractor.graph_layout)
-    # i = 0
-    # while cap.isOpened():
-    #     ret, frame = cap.read()
-    #     if not ret:
-    #         break
-    #     for p in range(5):
-    #         frame = gp(frame, data, i, p)
-    #     i += 1
-    #     cv2.imshow('frame', frame)
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
+# if __name__ == '__main__':
+#     logger = init_logger('Visualizer')
+#     parser = ArgumentParser()
+#     parser.add_argument('-cfg', '--config_path')
+#     # parser.add_argument("-v", "--video_path")
+#     # parser.add_argument("-p", "--processed_dir", default=r'Z:\Users\TalBarami\models_outputs\processed')
+#     # parser.add_argument("-out", "--out_dir")
+#     # parser.add_argument("-s", "--start")
+#     # parser.add_argument("-t", "--end")
+#     # parser.add_argument("-a", "--ann", action='store_true')
+#     # parser.add_argument('-j', '--jordi', action='store_true')
+#     # parser.add_argument('-b', '--barni', action='store_true')
+#     # parser.add_argument('-c', '--scale', type=int, default=1)
+#     args = parser.parse_args()
+#
+#     cfg = load_config(args.config_path)
+#
+#     logger.info(f'Visualizer initialized with config:{cfg}')
+#     name, ext = osp.splitext(osp.basename(cfg.paths.video))
+#     if cfg.model.method == 'annotations':
+#         create_jordi_ann(cfg)
+#     else:
+#         if args.jordi:
+#             out_path = osp.join(args.out_dir, f'{name}_SMMs.avi')
+#             logger.info(f'Creating Jordi video for {name}')
+#             create_jordi(video_path=args.video_path, processed_dir=args.processed_dir, out_path=out_path,
+#                          start=args.start, end=args.end, scale=args.scale)
+#         if args.barni:
+#             out_path = osp.join(args.out_dir, f'{name}_Facial.mp4')
+#             logger.info(f'Creating Barni video for {name}')
+#             create_barni(video_path=args.video_path, processed_dir=args.processed_dir, out_path=out_path,
+#                          start=args.start, end=args.end, scale=args.scale)

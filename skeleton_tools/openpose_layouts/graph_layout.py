@@ -15,8 +15,12 @@ class GraphLayout:
 
     def face_joints(self):
         return [k for k in self._pose_map.keys() if type(k) == str and any(s in k for s in ['Eye', 'Ear', 'Nose'])]
+
     def __len__(self):
         return self._len
+
+    def __call__(self, *args, **kwargs):
+        return self
 
     def joint(self, i):
         return self._pose_map[i]
@@ -29,6 +33,7 @@ class GraphLayout:
 
     def neighbors(self, i):
         return []
+
 
 def convert_layout(np_data, l1, l2):
     assert len(l2) <= len(l1)

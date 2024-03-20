@@ -8,6 +8,8 @@ from os import path as osp
 from pathlib import Path
 import itertools
 
+from scipy.signal import savgol_filter as savitzky_golay
+from scipy.ndimage import gaussian_filter1d
 import ffmpeg
 from omegaconf import OmegaConf
 import pandas as pd
@@ -272,3 +274,24 @@ def convert_video(video_path, out_path):
         ret, frame = cap.read()
     cap.release()
     writer.release()
+
+def savgol_filter(df, subset, window_length, polyorder):
+    return _pass_filter(df, subset, lambda x: savitzky_golay(x, window_length=window_length, polyorder=polyorder))
+
+def gaussian_filter(df, subset, kernel_size):
+    return _pass_filter(df, subset, lambda x: gaussian_filter1d(x, sigma=kernel_size / 6.0, truncate=kernel_size / 2.0))
+
+def _pass_filter(df, subset, f):
+    if type(df) != pd.DataFrame:
+        df = pd.DataFrame(df)
+    if not subset:
+        subset = df.columns
+    for c in subset:
+        e_raw = df[c]
+        try:
+            df[c] = f(df[c].ffill().fillna(0))
+        except RuntimeError as e:
+            print(f'Error in filter: {c} - {e}')
+            raise e
+        df.loc[df[e_raw.isna()].index, c] = np.nan
+    return df
