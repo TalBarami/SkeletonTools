@@ -23,12 +23,12 @@ from skeleton_tools.utils.constants import EPSILON
 #     cv2.putText(frame, str(pid), (int(x_center), int(y_center)), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2, cv2.LINE_AA)
 #
 #
-def blur_area(frame, center, radius):
+def blur_area(frame, center, radius, kernel_size=(50, 50)):
     c_mask = np.zeros(frame.shape[:2], np.uint8)
     cv2.circle(c_mask, center, radius, 1, thickness=-1)
     mask = cv2.bitwise_and(frame, frame, mask=c_mask)
     img_mask = frame - mask
-    blur = cv2.blur(frame, (50, 50))
+    blur = cv2.blur(frame, kernel_size)
     mask2 = cv2.bitwise_and(blur, blur, mask=c_mask)  # mask
     final_img = img_mask + mask2
     return final_img

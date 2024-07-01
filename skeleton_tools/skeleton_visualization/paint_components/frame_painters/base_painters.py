@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 
 from skeleton_tools.skeleton_visualization.paint_components.paint_utils import blur_area
+from skeleton_tools.utils.skeleton_utils import box_distance
 
 
 class BasePainter(ABC):
@@ -45,13 +46,13 @@ class LocalPainter(BasePainter):
     def __call__(self, frame, data, frame_id, person_id):
         return self._paint(frame, *self._get(data, frame_id, person_id))
 
-    def _get_color(self, data, frame_id, person_id):
+    def _get_color(self, data, frame_id, person_id, col_name='colors'):
         if type(self.color) == list:
             color = self.color[person_id % len(self.color)]
         elif type(self.color) == tuple:
             color = self.color
         else:
-            color = tuple(int(c) for c in data['colors'][person_id, frame_id])[::-1]
+            color = tuple(int(c) for c in data[col_name][person_id, frame_id])[::-1]
         return color
 
 
@@ -73,10 +74,23 @@ class ScaleAbsPainter(GlobalPainter):
             frame = cv2.convertScaleAbs(frame, alpha=self.alpha, beta=self.beta)
         return frame
 
+class CropPainter(GlobalPainter):
+    def __init__(self, width, height):
+        super().__init__(self)
+        self.w0, self.w1 = width
+        self.h0, self.h1 = height
+
+    def _paint(self, frame, data, frame_id):
+        h, w = frame.shape[:2]
+        h0, h1, w0, w1 = int(h * self.h0), int(h * self.h1), int(w * self.w0), int(w * self.w1)
+        return frame[h0:h1, w0:w1]
+
+
 class BlurPainter(GlobalPainter):
-    def __init__(self, data, radius=None, active=True):
+    def __init__(self, data, delay=0, radius=None, active=True):
         super().__init__(self)
         self.data = data
+        self.delay = delay
         self.radius = radius
         self.active = active
         face_boxes = self.data['face_boxes']
@@ -90,7 +104,7 @@ class BlurPainter(GlobalPainter):
                 if np.sum(b) > 0:
                     last_boxes[j] = b
                     last_boxes_idx[j] = f
-                if f - last_boxes_idx[j] > 5:
+                if f - last_boxes_idx[j] > self.delay:
                     continue
                 blur_boxes[j, f] = last_boxes[j]
         # for f in reversed(range(face_boxes.shape[1])):

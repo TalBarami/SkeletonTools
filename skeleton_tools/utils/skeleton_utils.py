@@ -336,6 +336,34 @@ def to_fft(data_numpy):
 #     }
 #     return box
 
+def get_intersection_area(_bb1, _bb2):
+    def convert(bb):
+        return {'x1': bb[0] - bb[2] // 2,
+                'y1': bb[1] - bb[3] // 2,
+                'x2': bb[0] + bb[2] // 2,
+                'y2': bb[1] + bb[3] // 2}
+    bb1 = convert(_bb1)
+    bb2 = convert(_bb2)
+
+    assert bb1['x1'] <= bb1['x2']
+    assert bb1['y1'] <= bb1['y2']
+    assert bb2['x1'] <= bb2['x2']
+    assert bb2['y1'] <= bb2['y2']
+
+    # determine the coordinates of the intersection rectangle
+    x_left = max(bb1['x1'], bb2['x1'])
+    y_top = max(bb1['y1'], bb2['y1'])
+    x_right = min(bb1['x2'], bb2['x2'])
+    y_bottom = min(bb1['y2'], bb2['y2'])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    # The intersection of two axis-aligned bounding boxes is always an
+    # axis-aligned bounding box
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+    return intersection_area
+
 def get_iou(_bb1, _bb2):
     def convert(bb):
         return {'x1': bb[0] - bb[2] // 2,
@@ -376,12 +404,17 @@ def get_iou(_bb1, _bb2):
     return iou
 
 
+def get_boxes(kp, score):
+    M = kp.shape[0]
+    return [bounding_box(kp[i].T, score[i]).reshape(-1) for i in range(M)]
+
+
 def box_distance(b1, b2):
     c1, _ = b1
     c2, _ = b2
     return np.linalg.norm(c1 - c2)
 
-def bounding_box(pose, score, epsilon=EPSILON):
+def bounding_box(pose, score, epsilon=EPSILON, method='xywh'):
     pose, score = np.array(pose), np.array(score)
     if pose.shape[1] == 2:
         pose = pose.T
@@ -391,7 +424,15 @@ def bounding_box(pose, score, epsilon=EPSILON):
     if not any(y):
         y = np.array([0])
     w, h = (np.max(x) - np.min(x)), (np.max(y) - np.min(y))
-    return np.array([np.min(x) + w / 2, np.min(y) + h / 2, w, h]).reshape((2, 2))
+
+    mx, my = np.min(x), np.min(y)
+    if method == 'xywh':
+        out = np.array([mx + w / 2, my + h / 2, w, h]).reshape((2, 2))
+    elif method == 'xyxy':
+        out = np.array([mx, my, mx+w, mx+h])
+    else:
+        raise ValueError("No such bbox method")
+    return out.reshape((2, 2))
 
 
 def openpose_match(data_numpy):

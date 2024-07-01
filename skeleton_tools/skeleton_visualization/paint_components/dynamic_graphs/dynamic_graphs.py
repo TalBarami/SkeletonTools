@@ -97,9 +97,9 @@ class DynamicPolar(DynamicGraph):
         return fig2np(fig)
 
 class DynamicSkeleton:
-    def __init__(self, data, height, layout, epsilon, child_only=False, width=None):
+    def __init__(self, data, height, layout, epsilon, child_only=False, width=None, tracking=False, limbs=True, heatmap=False):
         self.child_only = child_only
-        self.painter = GraphPainter(layout, epsilon, child_only=self.child_only)
+        self.painter = GraphPainter(layout, epsilon, child_only=self.child_only, limbs=limbs, tracking=tracking, heatmap=heatmap)
         self.width, self.height = int(1.5 * height) if width is None else width, height
         landmarks = data['landmarks'].copy()
         (w, h) = data['resolution']
@@ -114,6 +114,8 @@ class DynamicSkeleton:
             'colors': data['colors'],
             'child_ids': data['child_ids'],
         }
+        if 'person_ids' in data.keys():
+            self.data['person_colors'] = data['person_colors']
 
     def plot(self, i):
         frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)

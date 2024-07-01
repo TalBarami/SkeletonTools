@@ -52,6 +52,7 @@ def load_config(file):
         return OmegaConf.load(fp.name)
 
 def init_logger(log_name, log_path=None):
+    init_directories(log_path)
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.DEBUG)
 
@@ -80,8 +81,6 @@ def get_videos(root=osp.join(REMOTE_STORAGE, 'recordings')):
         for file in files:
             if osp.splitext(file)[1].lower() in ['.mp4', '.avi']:
                 video_files[osp.basename(file)] = osp.join(dir_path, file)
-            else:
-                print(1)
     return video_files
 
 
@@ -120,7 +119,7 @@ def write_pkl(p, dst):
 
 def take_subclip(video_path, start_time, end_time, fps, out_path):
     ffmpeg.input(video_path).video \
-        .trim(start=start_time, end=end_time) \
+        .trim(start_frame=start_time, end_frame=end_time) \
         .setpts('PTS-STARTPTS') \
         .filter('fps', fps=fps, round='up') \
         .output(out_path) \
@@ -295,3 +294,26 @@ def _pass_filter(df, subset, f):
             raise e
         df.loc[df[e_raw.isna()].index, c] = np.nan
     return df
+
+if __name__ == '__main__':
+    # with open(r'D:\repos\mmaction2\work_dirs\posec3d_autism_center_binary\20240528_135128.log.json', 'r') as f:
+    #     data = f.readlines()
+    # data = [eval(x) for x in data[1:]]
+    # idx = [i for i, x in enumerate(data) if x['mode'] == 'val']
+    # j = 0
+    # time = []
+    # for i in idx:
+    #     time.append(np.sum([x['time'] for x in data[j:i]]))
+    #     j = i+1
+    # print(1)
+
+
+    with open(r'D:\repos\mmaction2\work_dirs\posec3d_autism_center_binary_scratch\20240601_113025.log', 'r') as f:
+        data = f.readlines()
+    data = [l for l in data if 'Saving checkpoint at' in l or 'Epoch(val)' in l][1:]
+    time = []
+    for i in range(0, len(data)-1, 2):
+        t1 = pd.to_datetime(' '.join(data[i].split(' ')[:2]))
+        t2 = pd.to_datetime(' '.join(data[i+1].split(' ')[:2]))
+        time.append((t2 - t1).total_seconds() / 60)
+    print(1)

@@ -8,7 +8,9 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from evenvizion.processing import video_processing, json
+# from evenvizion.processing import video_processing, json
+import json
+
 from tqdm import tqdm
 
 from skeleton_tools.openpose_layouts.graph_layout import GraphLayout
@@ -16,15 +18,18 @@ from skeleton_tools.utils.tools import read_json, write_json
 
 
 class AcurusTracker:
-    def __init__(self, skeleton_layout: GraphLayout, acurus_path='C:/research/AcurusTrack', acurus_env=r'C:\Users\owner\anaconda3\envs\acurus\python.exe'):
+    def __init__(self, skeleton_layout: GraphLayout, acurus_path='D:/repos/AcurusTrack', acurus_env=r'C:\Users\owner\anaconda3\envs\acurus\python.exe'):
         self.skeleton_layout = skeleton_layout
         self.acurus_path = acurus_path
         self.acurus_env = acurus_env
         self.special_joints = {
-            'MidHip': [self.skeleton_layout.joint('MidHip')],
-            'Neck': [self.skeleton_layout.joint('Neck')],
+            'MidHip': [self.skeleton_layout.joint('LHip'), self.skeleton_layout.joint('RHip')],
+            'Neck': [self.skeleton_layout.joint('LShoulder'), self.skeleton_layout.joint('RShoulder')],
+            # 'MidHip': [self.skeleton_layout.joint('MidHip')],
+            # 'Neck': [self.skeleton_layout.joint('Neck')],
             'Nose': [self.skeleton_layout.joint('Nose')],
-            'BigToes': [self.skeleton_layout.joint('LBigToe'), self.skeleton_layout.joint('RBigToe')]
+            'BigToes': [self.skeleton_layout.joint('LAnkle'), self.skeleton_layout.joint('RAnkle')]
+            # 'BigToes': [self.skeleton_layout.joint('LBigToe'), self.skeleton_layout.joint('RBigToe')]
         }
 
     def special_joints_info(self, name, x, y, c, idxs):
@@ -57,12 +62,13 @@ class AcurusTracker:
 
     def skeleton_to_acurus(self, skeleton):
         result = {}
-        for frame_id, frame_info in tqdm(enumerate(skeleton), ascii=True, desc="JSON to Acurus"):
+        kps = list(zip(skeleton['keypoint'].transpose(1, 0, 2, 3), skeleton['keypoint_score'].transpose(1, 0, 2)))
+        for frame_id, (pose, score) in tqdm(enumerate(kps), ascii=True, desc="JSON to Acurus"):
             skeletons = []
-            people = frame_info['skeleton']
-            for p in people:
-                x, y = p['pose'][::2], p['pose'][1::2]
-                c = p['pose_score']
+            for i in range(score.shape[0]):
+                x, y, c = pose[i, :, 0], pose[i, :, 1], score[i]
+                if np.sum(c) == 0:
+                    continue
                 p_stats = {'person': [list(p) for p in zip(x, y, c)]}
                 for n, j in self.special_joints.items():
                     p_stats.update(self.special_joints_info(n, x, y, c, j))
@@ -88,6 +94,18 @@ class AcurusTracker:
                            'skeleton': skeletons})
         return result
 
+    def apply_results(self, final_meta, skeleton):
+        final_meta = {int(k): v for k, v in final_meta.items()}
+        tracking = np.ones(skeleton['keypoint_score'].shape[:2], dtype=int) * -1
+        for k, v in final_meta.items():
+            ps = [p['index'] for p in v]
+            tracking[:len(ps), k] = ps
+        skeleton['tracking'] = tracking
+        return skeleton
+
+
+
+
     def track(self, skeleton, video_path, fixed_coordinate=False):
         video_name, _ = path.splitext(path.basename(video_path))
         experiment_name = 'exp'
@@ -106,14 +124,14 @@ class AcurusTracker:
             'video_name': f'\"{video_name}\"',
             'exp_name': f'\"{experiment_name}\"'
         }
-        if fixed_coordinate:
-            print(f'Creating homography dict...')
-            cap = cv2.VideoCapture(video_path)
-            homography_dict = video_processing.get_homography_dict(cap)
-            with open(homography_dict_path, "w") as json_:
-                json.dump(homography_dict, json_)
-            params['path_to_homography_dict'] = f'\"{homography_dict_path}\"'
-            cap.release()
+        # if fixed_coordinate:
+        #     print(f'Creating homography dict...')
+        #     cap = cv2.VideoCapture(video_path)
+        #     homography_dict = video_processing.get_homography_dict(cap)
+        #     with open(homography_dict_path, "w") as json_:
+        #         json.dump(homography_dict, json_)
+        #     params['path_to_homography_dict'] = f'\"{homography_dict_path}\"'
+        #     cap.release()
 
         # process_dir = path.join(self.acurus_path, 'process')
         # Path(process_dir, 'acurus').mkdir(parents=True, exist_ok=True)
@@ -153,6 +171,7 @@ class AcurusTracker:
         os.chdir(self.acurus_path)
         try:
             subprocess.check_call(shlex.split(cmd), universal_newlines=True)
+            final_meta = read_json(out_path)
         # except:
         #     params['force'] = True
         #     args = ' '.join([f'--{k} {v}' for k, v in params.items()])
@@ -164,10 +183,11 @@ class AcurusTracker:
         #     # except:
         #     #     print(f'Execution with force failed: {cmd}')
         #     #     return skeleton
+        except Exception as e:
+            raise e
         finally:
             os.chdir(cwd)
+            shutil.rmtree(process_dir)
+            shutil.rmtree(path.join(self.acurus_path, 'results', video_name))
 
-        final_meta = read_json(out_path)
-        shutil.rmtree(process_dir)
-        shutil.rmtree(path.join(self.acurus_path, 'results', video_name))
-        return self.acurus_to_skeleton(final_meta)
+        return self.apply_results(final_meta, skeleton)

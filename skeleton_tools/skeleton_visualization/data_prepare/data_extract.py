@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from os import path as osp
+import seaborn as sns
 
 from skeleton_tools.openpose_layouts.body import COCO_LAYOUT
 from skeleton_tools.openpose_layouts.face import PYFEAT_FACIAL
@@ -17,6 +18,7 @@ class VisualizerDataExtractor(ABC):
         self.graph_layout = graph_layout
         self.scale = scale
         self.epsilon = 1e-1
+        self.cmap = sns.color_palette('bright', 25)
 
     @abstractmethod
     def _extract(self, cfg):
@@ -29,6 +31,9 @@ class VisualizerDataExtractor(ABC):
         M, T = result['landmarks'].shape[:2]
         result['label_text'] = np.array([['Child' if cids[t] == i else 'Adult' for t in range(T)] for i in range(M)])
         result['colors'] = np.array([[(255, 0, 0) if cids[t] == i else (0, 0, 255) for t in range(T)] for i in range(M)])
+        if 'person_ids' in result.keys():
+            pids = result['person_ids'].astype(int)
+            result['person_colors'] = np.array([[self.cmap[pids[i, t]] for t in range(T)] for i in range(M)]) * 255
         # result['label_text'] = np.array([['Child' if i == 0 else 'Adult' for t in range(T)] for i in range(M)])
         # result['colors'] = np.array([[(255, 0, 0) if i == 0 else (0, 0, 255) for t in range(T)] for i in range(M)])
 
@@ -43,12 +48,16 @@ class MMPoseDataExtractor(VisualizerDataExtractor):
         return boxes
 
     def _extract(self, cfg):
-        cfg['skeleton_path'] = osp.join(cfg['paths']['processed'], cfg['name'], 'jordi', f'{cfg["name"]}.pkl')
+        if cfg['paths']['processed'].endswith('.pkl'):
+            cfg['skeleton_path'] = cfg['paths']['processed']
+        else:
+            cfg['skeleton_path'] = osp.join(cfg['paths']['processed'], cfg['name'], 'jordi', f'{cfg["name"]}.pkl')
         cfg['predictions_path'] = osp.join(cfg['paths']['processed'], cfg['name'], 'jordi', 'cv0.pth', f'{cfg["name"]}_scores.csv')
         skeleton_path, predictions_path = cfg['skeleton_path'], cfg['predictions_path']
         data = read_pkl(skeleton_path)
         landmarks, landmarks_scores, cids = data['keypoint'] * self.scale, data['keypoint_score'], data['child_ids'].astype(int)
-        landmarks, cids = self.fix_detections(landmarks, landmarks_scores, cids)
+        cids = self.fix_detections(landmarks, landmarks_scores, cids)
+        pids = data['person_ids'] if 'person_ids' in data.keys() else (np.ones(landmarks.shape[:2], dtype=int) * -1)
         T = landmarks.shape[1]
         if osp.exists(predictions_path):
             scores = pd.read_csv(predictions_path)
@@ -63,7 +72,8 @@ class MMPoseDataExtractor(VisualizerDataExtractor):
         result = {'landmarks': landmarks.astype(int), 'landmarks_scores': landmarks_scores,
                   'resolution': np.array(data['img_shape']).astype(int) * self.scale, 'fps': data['fps'], 'frame_count': data['total_frames'], 'duration_seconds': data['length_seconds'],
                   'video_path': data['video_path'], 'filename': data['frame_dir'],
-                  'child_ids': cids, 'child_detection_scores': data['child_detected'], 'predictions': scores}
+                  'child_ids': cids, 'child_detection_scores': data['child_detected'], 'predictions': scores, 'person_ids': pids}
+
 
         face_joints = [k for k, v in self.graph_layout.joints().items() if any([s in v for s in self.graph_layout.face_joints()])]
         result['boxes'] = self._gen_boxes(landmarks, landmarks_scores).astype(int)
@@ -78,42 +88,41 @@ class MMPoseDataExtractor(VisualizerDataExtractor):
         score_threshold = 0.1
         M, T = landmarks.shape[:2]
         for t in range(k, T-k):
-            left = np.array([landmarks[cids[_t], _t] for _t in range(t - k, t) if cids[_t] != -1])
+            left = np.array([landmarks[new_cids[_t], _t] for _t in range(t - k, t) if new_cids[_t] != -1 and landmarks_scores[new_cids[_t], _t].mean() > 0.2])
             right = np.array([landmarks[cids[_t], _t] for _t in range(t, t + k) if cids[_t] != -1])
             people = np.array([landmarks[p, t] for p in range(M) if landmarks_scores[p, t].mean() > score_threshold])
-            if not left.any() or not right.any() or not people.any():
+            if not people.any():
                 continue
-            dists_left = np.linalg.norm(left[:, None] - people[None], axis=-1)
-            for m in range(dists_left.shape[1]):
-                dists_left[:, m, :] = np.where(landmarks_scores[m, t] > score_threshold, dists_left[:, m, :], 0)
-            dists_left = dists_left.mean(axis=2)
-            majority_left = np.argmin(dists_left, axis=1)
-            dists_right = np.linalg.norm(right[:, None] - people[None], axis=-1)
-            for m in range(dists_right.shape[1]):
-                dists_right[:, m, :] = np.where(landmarks_scores[m, t] > score_threshold, dists_right[:, m, :], 0)
-            dists_right = dists_right.mean(axis=2)
-            majority_right = np.argmin(dists_right, axis=1)
-            majority = np.argmax(np.bincount(np.concatenate([majority_left, majority_right])))
-            # if t == 30925:
-            #     print(1)
-            #     painter = GlobalPainter(GraphPainter(graph_layout=COCO_LAYOUT, epsilon=0.3, alpha=1, child_only=False))
-            #     data = {'landmarks': landmarks.astype(int), 'landmarks_scores': landmarks_scores, 'child_id': 2}
-            #     frame = np.zeros((800, 1080, 3), dtype=np.uint8)
-            #     new_frame = painter(frame, data, t)
-            #     cv2.imshow('', new_frame); cv2.waitKey(0)
-            if cids[t] != -1 and cids[t] != majority:
-                print(f'Changing {cids[t]} to {majority} at frame {t}')
-                new_cids[t] = majority
+            if not left.any():
+                left = np.zeros((0, 17, 2))
+            if not right.any():
+                right = np.zeros((0, 17, 2))
+            neighbors = np.concatenate([left, right])
+            if neighbors.any():
+                dists = np.linalg.norm(neighbors[:, None] - people[None], axis=-1)
+                for m in range(dists.shape[1]):
+                    dists[:, m, :] = np.where(landmarks_scores[m, t] > score_threshold, dists[:, m, :], np.nan)
+                dists = np.nanmean(dists, axis=2)#dists.mean(axis=2)
+                majority = np.argmin(dists, axis=1)
+                majority_votes = np.argmax(np.bincount(majority))
+                if cids[t] != -1 and cids[t] != majority_votes:
+                    print(f'Changing {cids[t]} to {majority_votes} at frame {t}')
+                    new_cids[t] = majority_votes
+                elif cids[t] == -1 and np.mean(dists[:, majority_votes]) < 180:
+                    print(f'Assigning new cid: {majority_votes} at frame {t}')
+                    new_cids[t] = majority_votes
+                else:
+                    new_cids[t] = cids[t]
             else:
                 new_cids[t] = cids[t]
-        return landmarks, new_cids
+        return new_cids
 
 class PyfeatDataExtractor(VisualizerDataExtractor):
     def __init__(self, graph_layout=PYFEAT_FACIAL, scale=1):
         super().__init__(graph_layout, scale)
 
     def _extract(self, cfg):
-        cfg['pkl_path'] = osp.join(cfg['paths']['process'], cfg['name'], 'barni', f'{cfg["name"]}.pkl')
+        cfg['pkl_path'] = osp.join(cfg['paths']['processed'], cfg['name'], 'barni', f'{cfg["name"]}.pkl')
         pkl_path = cfg['pkl_path']
         data = read_pkl(pkl_path)
         landmarks, landmarks_scores = data['landmarks'].astype(int) * self.scale, data['face_boxes'][:, :, 4]

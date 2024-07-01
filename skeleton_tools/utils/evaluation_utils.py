@@ -14,9 +14,9 @@ sns.set_theme()
 def unify(df):
     _df = pd.DataFrame(columns=df.columns)
 
-    def calc_weighted_mean_score(rows):
+    def calc_weighted_mean_score(rows, col):
         weights = [(row['end_frame'] - row['start_frame']) / (rows[-1]['end_frame'] - rows[0]['start_frame']) for row in rows]
-        scores = [row['stereotypical_score'] for row in rows]
+        scores = [row[col] for row in rows]
         return np.average(scores, weights=weights)
 
     n = df.shape[0]
@@ -36,39 +36,44 @@ def unify(df):
                 else:
                     break
             _df.loc[_df.shape[0]] = [merge[0]['video'], merge[0]['video_full_name'], merge[0]['video_path'], merge[0]['start_time'], merge[-1]['end_time'], merge[0]['start_frame'], merge[-1]['end_frame'],
-                                     merge[0]['movement'], merge[0]['calc_date'], merge[0]['annotator'], calc_weighted_mean_score(merge)]
+                                     merge[0]['movement'], merge[0]['calc_date'], merge[0]['annotator'], calc_weighted_mean_score(merge, 'stereotypical_score'), calc_weighted_mean_score(merge, 'no_action_score')]
         else:
             start_time = _df.iloc[_df.shape[0] - 1]['end_time'] if i > 0 else curr['start_time']
             end_time = df.iloc[i + 1]['start_time'] if i < n - 1 else curr['end_time']
             start_frame = _df.iloc[_df.shape[0] - 1]['end_frame'] if i > 0 else curr['start_frame']
             end_frame = df.iloc[i + 1]['start_frame'] if i < n - 1 else curr['end_frame']
             _df.loc[_df.shape[0]] = [curr['video'], curr['video_full_name'], curr['video_path'], start_time, end_time, start_frame, end_frame,
-                                     curr['movement'], curr['calc_date'], curr['annotator'], curr['stereotypical_score']]
+                                     curr['movement'], curr['calc_date'], curr['annotator'], curr['stereotypical_score'], curr['no_action_score']]
         i += 1
     return _df
 
 
-def aggregate(df, threshold):
+def aggregate(df, threshold=None):
     _df = pd.DataFrame(columns=df.columns)
-    df['prediction'] = np.where(df['stereotypical_score'] > threshold, 'Stereotypical', 'NoAction')
+    if threshold:
+        df['prediction'] = np.where(df['stereotypical_score'] > threshold, 'Stereotypical', 'NoAction')
+    else:
+        df['prediction'] = np.where(df['stereotypical_score'] > df['no_action_score'], 'Stereotypical', 'NoAction')
     i = 0
     while i < df.shape[0]:
         r = df.iloc[i]
-        s, t, c, p = r['start_frame'], r['end_frame'], r['stereotypical_score'], r['prediction']
+        s, t, c, n, p = r['start_frame'], r['end_frame'], r['stereotypical_score'], r['no_action_score'], r['prediction']
         _s, _t = r['start_time'], r['end_time']
         score = [c]
+        neg_score = [n]
         j = i + 1
         while j < df.shape[0]:
             rr = df.iloc[j]
-            ss, tt, cc, pp = rr['start_frame'], rr['end_frame'], rr['stereotypical_score'], rr['prediction']
+            ss, tt, cc, nn, pp = rr['start_frame'], rr['end_frame'], rr['stereotypical_score'], rr['no_action_score'], rr['prediction']
             if p == pp:
                 t = tt
                 _t = rr['end_time']
                 score.append(cc)
+                neg_score.append(nn)
             else:
                 break
             j += 1
-        _df.loc[_df.shape[0]] = [r['video'], r['video_full_name'], r['video_path'], _s, _t, s, t, p, pd.Timestamp.now(), NET_NAME, np.mean(score)]
+        _df.loc[_df.shape[0]] = [r['video'], r['video_full_name'], r['video_path'], _s, _t, s, t, p, pd.Timestamp.now(), r['annotator'], np.mean(score), np.mean(neg_score)]
         i = j
     return unify(_df)
 
@@ -113,13 +118,18 @@ def evaluate(_df, ground_truth, key='frame'):
 
     for i, row in df.iterrows():
         model_interval = row[[f'start_{key}', f'end_{key}']].values.tolist()
-        intersections = [x for x in ((get_intersection(model_interval, human_interval), human_interval) for human_interval in human_intervals) if x[0] is not None]
+        intersections = [(i, get_intersection(model_interval, human_interval), human_interval) for i, human_interval in enumerate(human_intervals)]
+        intersections = [(i, m, h) for i, m, h in intersections if m is not None]
         slength = row['segment_length']
         if row['movement'] == 1:
-            hit, miss = (slength, 0) if len(intersections) > 0 else (0, slength)
+            hit = np.sum([t-s for _, _, (s, t) in intersections])
+            miss = slength - hit
+            # remove from human intervals:
+            human_intervals = [h for i, h in enumerate(human_intervals) if i not in [j for j, _, _ in intersections]]
+            # hit, miss = (slength, 0) if len(intersections) > 0 else (0, slength)
         else:
-            intersections = [intersect for intersect, interval in intersections if intersect == interval]
-            miss = np.sum([min(high, model_interval[1]) - max(low, model_interval[0]) for (low, high) in intersections])
+            punish = [intersect for _, intersect, interval in intersections if intersect == interval]
+            miss = np.sum([min(high, model_interval[1]) - max(low, model_interval[0]) for (low, high) in punish])
             hit = slength - miss
         df.loc[i, ['hit_score', 'miss_score']] = hit, miss
 
@@ -132,29 +142,26 @@ def evaluate(_df, ground_truth, key='frame'):
     return tp, fp, fn, tn
 
 
-def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False):
+def evaluate_threshold(score_files, human_labels, thresholds, per_assessment=False):
     if per_assessment:
         human_labels = pd.concat([aggregate_cameras(g, fillna=False) for _, g in human_labels.groupby('assessment')])
-    init_directories(out_path)
     dfs = pd.concat([pd.read_csv(fp) for f, fp in score_files.values])
-    thresholds = np.round(np.arange(0.5, 1, 0.05), 3)
-    a, p, r = [], [], []
     df = pd.DataFrame(columns=['video', 'threshold', 'tp', 'fp', 'fn', 'tn', 'frame_count'])
     for t in thresholds:
-        print(f'Threshold: {t}')
-        out_file = osp.join(out_path, f'predictions_{t}.csv')
-        if osp.exists(out_file):
-            print(f'Loading predictions from {out_file}...')
-            agg = pd.read_csv(out_file)
-        else:
-            print(f'Preparing dataframes...')
-            agg = pd.concat([aggregate(df, t) for _, df in dfs.groupby('video')])
-            agg['assessment'] = agg['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
-            agg['child_key'] = agg['assessment'].apply(lambda s: s.split('_')[0])
-            frames_counts = agg.groupby('video')['end_frame'].max().reset_index()
-            frames_counts.columns = ['video', 'frame_count']
-            agg = pd.merge(agg, frames_counts, on='video', how='left')
-            agg.to_csv(out_file, index=False)
+        # print(f'Threshold: {t}')
+        # out_file = osp.join(out_path, f'predictions_{t}.csv')
+        # if osp.exists(out_file):
+        #     print(f'Loading predictions from {out_file}...')
+        #     agg = pd.read_csv(out_file)
+        # else:
+        # print(f'Preparing dataframes...')
+        agg = pd.concat([aggregate(df, t) for _, df in dfs.groupby('video')])
+        agg['assessment'] = agg['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
+        agg['child_key'] = agg['assessment'].apply(lambda s: s.split('_')[0])
+        frames_counts = agg.groupby('video')['end_frame'].max().reset_index()
+        frames_counts.columns = ['video', 'frame_count']
+        agg = pd.merge(agg, frames_counts, on='video', how='left')
+            # agg.to_csv(out_file, index=False)
         n, m = agg['video'].nunique(), agg['assessment'].nunique()
         if per_assessment:
             agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
@@ -166,18 +173,32 @@ def evaluate_threshold(score_files, human_labels, out_path, per_assessment=False
         _df = df[df['threshold'] == t]
         tp, fp, fn, tn = np.sum(_df[['tp', 'fp', 'fn', 'tn']].values, axis=0)
         accuracy, precision, recall = (tp + tn) / (tp + tn + fp + fn), tp / (tp + fp), tp / (tp + fn)
-        print(f'\tAccuracy={accuracy}, Precision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
-        # tp, fp, fn, tn = np.sum(list(zip(*[evaluate(df, human_labels, key='frame') for df in agg])), axis=1)
-        # accuracy, precision, recall = (tp + tn) / (tp + tn + fp + fn), tp / (tp + fp), tp / (tp + fn)
-        # print(f'\tAccuracy={accuracy}, Precision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
-        # a.append(accuracy)
-        # p.append(precision)
-        # r.append(recall)
-    # a, p, r = np.array(a), np.array(p), np.array(r)
-    # f1 = 2 * p * r / (p + r)
-    # return thresholds, a, p, r, f1
+        f1 = 2 * precision * recall / (precision + recall)
+        print(f'\t{t}: F1={f1}, Accuracy={accuracy}, Precision={precision}, Recall={recall} (Total {m} assessments over {n} videos, per_assessment={per_assessment})')
     return df
 
+def evaluate_model(score_files, human_labels, per_assessment=False):
+    if per_assessment:
+        human_labels = pd.concat([aggregate_cameras(g, fillna=False) for _, g in human_labels.groupby('assessment')])
+    agg = pd.concat([pd.read_csv(fp) for f, fp in score_files.values])
+    df = pd.DataFrame(columns=['video', 'tp', 'fp', 'fn', 'tn', 'frame_count'])
+    agg['assessment'] = agg['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))
+    agg['child_key'] = agg['assessment'].apply(lambda s: s.split('_')[0])
+    frames_counts = agg.groupby('video')['end_frame'].max().reset_index()
+    frames_counts.columns = ['video', 'frame_count']
+    agg = pd.merge(agg, frames_counts, on='video', how='left')
+    n, m, c = agg['video'].nunique(), agg['assessment'].nunique(), agg['child_key'].nunique()
+    if per_assessment:
+        agg = [aggregate_cameras(g, fillna=True) for _, g in agg.groupby('assessment')]
+    else:
+        agg = [df.reset_index() for _, df in agg.groupby('video')]
+    for _df in agg:
+        tp, fp, fn, tn = evaluate(_df, human_labels, key='frame')
+        df.loc[df.shape[0]] = [_df['video'].iloc[0], tp, fp, fn, tn, _df['frame_count'].iloc[0]]
+    tp, fp, fn, tn = np.sum(df[['tp', 'fp', 'fn', 'tn']].values, axis=0)
+    accuracy, precision, recall = (tp + tn) / (tp + tn + fp + fn), tp / (tp + fp), tp / (tp + fn)
+    print(f'\tAccuracy={accuracy}, Precision={precision}, Recall={recall} (Total {m} assessments over {n} videos of {c} children. per_assessment={per_assessment}).')
+    return df
 
 def aggregate_table(df):
     df = df[df['movement'] != 'NoAction']
@@ -232,13 +253,21 @@ def aggregate_cameras(agg_df, fillna=False):
     out = out.sort_values(by=['assessment', 'start_frame']).reset_index(drop=True)
     if fillna:
         assessment = agg_df.iloc[0]['assessment']
-        n = out.shape[0]
-        s = 0
-        for i in range(n):
-            curr_row = out.loc[i]
-            out.loc[out.shape[0]] = (assessment, s, curr_row['start_frame'], 'NoAction')
-            s = curr_row['end_frame']
-        out.loc[out.shape[0]] = (assessment, s, frame_count, 'NoAction')
+        out_na = pd.DataFrame(columns=out.columns)
+        if out.empty:
+            out_na.loc[out_na.shape[0]] = (assessment, 0, frame_count, 'NoAction')
+        else:
+            n = out.shape[0]
+            for i in range(n-1):
+                curr_row = out.loc[i]
+                next_row = out.loc[i+1]
+                s, t = curr_row['end_frame'], next_row['start_frame']
+                out_na.loc[out_na.shape[0]] = (assessment, s, t, 'NoAction')
+            if out.loc[0]['start_frame'] > 0:
+                out_na.loc[out_na.shape[0]] = (assessment, 0, out.loc[0]['start_frame'], 'NoAction')
+            if out.loc[n-1]['end_frame'] < frame_count:
+                out_na.loc[out_na.shape[0]] = (assessment, out.loc[n-1]['end_frame'], frame_count, 'NoAction')
+        out = pd.concat([out, out_na])
     out['frame_count'] = frame_count
     out['video'] = out['assessment']
     # out['annotator'] = annotator
@@ -267,10 +296,10 @@ def intersect(*lst, on='assessment', exclude=None):
 
 
 def collect_labels(root, model_name, file_extension='annotations', out=None, subset=None):
+    names = [f for f in os.listdir(root)]
     if subset is not None:
-        files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in os.listdir(root) if f in subset]
-    else:
-        files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in os.listdir(root)]
+        names = [f for f in names if f in subset]
+    files = [osp.join(root, f, model_name, f'{f}_{file_extension}.csv') for f in names]
     dfs = [pd.read_csv(f) for f in files if osp.exists(f)]
     df = pd.concat(dfs)
     df['assessment'] = df['video'].apply(lambda s: '_'.join(s.split('_')[:-2]))

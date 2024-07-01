@@ -49,7 +49,7 @@ class ComponentsLoader:
         extractor = class_of(name)(**args | kwargs)
         data = extractor(self.config)
         self.set_param('DATA', data)
-        self.set_param('SIGNAL', data['predictions'])
+        # self.set_param('SIGNAL', data['predictions'])
         return data
 
     def create_painters(self, use_globals=True):

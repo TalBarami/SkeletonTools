@@ -440,8 +440,8 @@ if __name__ == '__main__':
     # exit()
     root = r'Z:\Users\TalBarami\jordi_cross_validation'
     sns.set_style(style='white')
-    # human = prepare(pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv'))
-    # data_statistics(human)
+    human = prepare(pd.read_csv(r'Z:\Users\TalBarami\JORDI\lancet_submission_data\annotations\combined.csv'))
+    data_statistics(human)
 
     # model = 'cv0.pth'
     # df, summary_df, agg_df, summary_agg_df = collect_predictions(root, model_name='cv0.pth')
